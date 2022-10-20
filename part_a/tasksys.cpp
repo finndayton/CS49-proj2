@@ -58,8 +58,13 @@ TaskSystemParallelSpawn::TaskSystemParallelSpawn(int num_threads): ITaskSystem(n
     max_threads_ = num_threads;
 }
 
-static inline void thread_worker_function(IRunnable* runnable, int task_id, int num_total_tasks) {
-    runnable->runTask(task_id, num_total_tasks);
+static inline void thread_worker_function(IRunnable* runnable, int thread_id, int num_threads, int num_total_tasks) {
+    int tasks_per_thread = num_total_tasks / num_threads;
+    // task_id should be from 0 to num_total_tasks - 1
+    int task_id_start = thread_id * tasks_per_thread;
+    int task_id_end = task_id_start + tasks_per_thread;
+    for (int i = task_id_start; i < task_id_end; i++)
+    runnable->runTask(i, num_total_tasks);
 }
 
 TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
@@ -76,18 +81,17 @@ void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
     // Make up to std::min(num_threads,  num_total_tasks) number of threads
     // each thread gets a certain contiguous chunk of the total work.
 
-    //runnable is, for example, a PingPongTask class instance, which extends IRunnable. 
-    //PingPongTask's implementation of runTask() is to fill and output array, from an input array, etc. 
-    //For this super_super_light test, our run() function is called 400 times (400 bulk task launches)
-    //with each launch containing 64 tasks to be done. num_elements = 32 * 1024;
+    // runnable is, for example, a PingPongTask class instance, which extends IRunnable. 
+    // PingPongTask's implementation of runTask() is to fill an output array, from an input array, etc. 
+    // For this super_light test, our run() function is called 400 times (400 bulk task launches)
+    // with each launch containing 64 tasks to be done. num_elements = 32 * 1024;
+    // and n_iters = 32. We and to parallelize these 64 tasks using num_thread threads. 
+    // 
 
     int num_threads = std::min(max_threads_, num_total_tasks);
     std::thread workers[num_threads];
-    int tasks_per_thread = num_total_tasks / num_threads;
-    // printf("num_total_tasks: %d\n", num_total_tasks);
     for (int i = 0; i < num_threads; i++) {
-        int task_id = i * tasks_per_thread;
-        workers[i] = std::thread(thread_worker_function, runnable, task_id, num_total_tasks);
+        workers[i] = std::thread(thread_worker_function, runnable, i, num_threads, num_total_tasks);
     }
 
     // handle case where (num_total_tasks / num_threads) is something like 258 / 8 = 32 tasks for
