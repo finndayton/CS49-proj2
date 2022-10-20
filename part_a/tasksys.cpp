@@ -60,11 +60,28 @@ TaskSystemParallelSpawn::TaskSystemParallelSpawn(int num_threads): ITaskSystem(n
 
 static inline void thread_worker_function(IRunnable* runnable, int thread_id, int num_threads, int num_total_tasks) {
     int tasks_per_thread = num_total_tasks / num_threads;
+
     // task_id should be from 0 to num_total_tasks - 1
     int task_id_start = thread_id * tasks_per_thread;
     int task_id_end = task_id_start + tasks_per_thread;
-    for (int i = task_id_start; i < task_id_end; i++)
-    runnable->runTask(i, num_total_tasks);
+    
+    /* 
+    Case where num_total_tasks % num_threads != 0
+    Example: num_total_tasks = 15
+             num_threads     = 8
+    In this case, we launch 8 threads. The 8 thread worker functions receive thread_ids {0, 1, 2...7}
+    But, tasks_per_thread for each thread worker is only 1 (15 / 8 = 1). This means the last thread, thread_id = 7,
+    is going to have to pick up the slack and, instead of just completing the 8th task, do task 8, 9, 10...15. That's right. 
+    This means that if (thread_id == num_threads - 1) AND num_total_tasks % num_threads != 0, we must update 
+    task_id_end to include tasks 9, 10, 11, 12...15. (7 more tasks). This is num_total_tasks % num_threads MORE tasks 
+    */ 
+
+    if (thread_id == num_threads - 1 && num_total_tasks % num_threads != 0) {
+        task_id_end += num_total_tasks % num_threads;
+    }
+    for (int i = task_id_start; i < task_id_end; i++) {
+        runnable->runTask(i, num_total_tasks);
+    }
 }
 
 TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
