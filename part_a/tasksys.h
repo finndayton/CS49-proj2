@@ -5,6 +5,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <queue>
 
 /*
  * TaskSystemSerial: This class is the student's implementation of a
@@ -39,7 +40,7 @@ class TaskSystemParallelSpawn: public ITaskSystem {
         void sync();
         static void workerThreadStart(IRunnable* runnable, int start, int end, int num_total_tasks);
     private:
-        int max_threads;
+        int max_threads_;
 };
 
 
@@ -67,10 +68,10 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
     private:
         int max_threads;
         std::atomic<int>* busy_threads;
-        std::vector<Task*> queue;
-        std::mutex* queue_mutex; // protects the queue
+        std::queue<Task*> task_queue;
+        std::mutex* task_queue_mutex; // protects the queue
         static void workerThreadFunc(
-            std::vector<Task*> queue,
+            std::queue<Task*>* task_queue,
             std::mutex* queue_mutex, 
             std::atomic<int>* busy_threads
         );

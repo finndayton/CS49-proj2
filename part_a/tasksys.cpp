@@ -42,6 +42,8 @@ void TaskSystemSerial::sync() {
  * ================================================================
  */
 
+
+//Shashank Implmentation
 const char* TaskSystemParallelSpawn::name() {
     return "Parallel + Always Spawn";
 }
@@ -54,7 +56,7 @@ TaskSystemParallelSpawn::TaskSystemParallelSpawn(int num_threads): ITaskSystem(n
     // (requiring changes to tasksys.h).
     //
     // TODO: SHASHANK assuming that max_threads refers to worker threads only not main thread
-    max_threads = num_threads;
+    max_threads_ = num_threads;
 }
 
 TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
@@ -69,12 +71,12 @@ void TaskSystemParallelSpawn::workerThreadStart(IRunnable* runnable, int start, 
 
 void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
     // static assignment is easiest
-    std::thread workers[max_threads];
-    int num_tasks_per_thread = num_total_tasks/max_threads;
+    std::thread workers[max_threads_];
+    int num_tasks_per_thread = num_total_tasks/max_threads_;
     int i = 0;
     int prev = 0;
     int next = num_tasks_per_thread;
-    while (i < max_threads) {
+    while (i < max_threads_) {
         workers[i] = std::thread(workerThreadStart, runnable, prev, next, num_total_tasks);
         prev = next;
         next = next + num_tasks_per_thread; 
@@ -82,7 +84,7 @@ void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
     }
 
     // join worker threads 
-    for (int i = 0; i < max_threads; i++) {
+    for (int i = 0; i < max_threads_; i++) {
         workers[i].join();
     }
 }
@@ -107,17 +109,16 @@ const char* TaskSystemParallelThreadPoolSpinning::name() {
 }
 
 TaskSystemParallelThreadPoolSpinning::TaskSystemParallelThreadPoolSpinning(int num_threads): ITaskSystem(num_threads) {
-    
     max_threads = num_threads;
-    queue_mutex = new std::mutex();
-    busy_threads = 0;
+    task_queue_mutex = new std::mutex();
+    *busy_threads = 0;
     // printf("mkaing thread pool");
     // makeThreadPool();
 }
 
 void TaskSystemParallelThreadPoolSpinning::makeThreadPool() {
     for (int i = 0; i < max_threads; i++) {
-        workers.push_back(std::thread(workerThreadFunc, queue, queue_mutex, busy_threads));
+        workers.push_back(std::thread(workerThreadFunc, &task_queue, task_queue_mutex, busy_threads));
     }
 }
 
@@ -129,39 +130,40 @@ void TaskSystemParallelThreadPoolSpinning::killThreadPool() {
 }
 
 TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning() {
-    delete queue_mutex;
+    // delete task_queue_mutex;
 }
 
 void TaskSystemParallelThreadPoolSpinning::workerThreadFunc(
-    std::vector<Task*> queue,
-    std::mutex* queue_mutex, 
+    std::queue<Task*>* task_queue,
+    std::mutex* task_queue_mutex, 
     std::atomic<int>* busy_threads
 ) {
     while (true) {
-        if (queue.empty()) {
+        if (task_queue->size() == 0) {
             // do nothing
             // printf("queue is empty, doing nothing!");
             // printf("queue empty");
             // if we are asked to terminate, end it 
         } else {
             // acquire mutex and then pop_back
-            queue_mutex->lock(); // common mutex for the class
+            task_queue_mutex->lock(); // common mutex for the class
             printf("acquired lock");
-            auto item = queue.back();
+            if (task_queue->size() == 0) break;
+            Task* task = task_queue->front();
             printf("took up a task!");
-            queue.pop_back();
+            task_queue->pop();
 
             // parent thread tries to check queue.size() here
 
-            busy_threads++;
-            queue_mutex->unlock();
+            *busy_threads++;
+            task_queue_mutex->unlock();
             // does it release the mutex now? it should
-            // do something with item
-            auto runnable = item->runnable;
-            auto i = item->thread_id;
-            auto num_total_tasks = item->num_total_tasks;
+            // do something with task
+            auto runnable = task->runnable;
+            auto i = task->thread_id;
+            auto num_total_tasks = task->num_total_tasks;
             runnable->runTask(i, num_total_tasks);
-            busy_threads--;
+            *busy_threads--;
         }
     }
 
@@ -170,6 +172,7 @@ void TaskSystemParallelThreadPoolSpinning::workerThreadFunc(
 void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_total_tasks) {
     // add tasks to queue, if queue is full, wait until there is space
     // return;
+    printf("run called");
     if (workers.size() == 0) {
         printf("making thread pool!");
         makeThreadPool();
@@ -180,13 +183,18 @@ void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_tota
 
     for (int i = 0; i < num_total_tasks; i++) {
         Task task = {runnable, i, num_total_tasks};
-        queue.push_back(&task);
+        task_queue.push(&task);
     }
     
     
-    while (busy_threads != 0 || queue.size() != 0) {
-        // wait 
+    while (true) {
+        // waiting...
+        printf("task_queue size: %d\n", task_queue.size());
+        if (*busy_threads == 0 && task_queue.size() == 0){
+            break;
+        }
     }
+
 }
 
 TaskID TaskSystemParallelThreadPoolSpinning::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
