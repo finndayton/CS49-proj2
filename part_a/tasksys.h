@@ -27,10 +27,7 @@ class TaskSystemSerial: public ITaskSystem {
  * of the ITaskSystem interface.
  */
 class TaskSystemParallelSpawn: public ITaskSystem {
-    // private:
-        // void thread_worker_function(IRunnable* runnable, int task_id, int num_total_tasks);
     public:
-        int max_threads_;
         TaskSystemParallelSpawn(int num_threads);
         ~TaskSystemParallelSpawn();
         const char* name();
@@ -38,7 +35,17 @@ class TaskSystemParallelSpawn: public ITaskSystem {
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+    private:
+        int max_threads_;
 
+};
+
+
+struct Task {
+    IRunnable* runnable;
+    int thread_id;
+    int num_threads;
+    int num_total_tasks;
 };
 
 /*
@@ -56,6 +63,11 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+    private:
+        int max_threads_;
+        std::vector<std::thread> workers;
+        std::queue<Task> tasks;
+
 };
 
 /*
