@@ -43,7 +43,7 @@ class TaskSystemParallelSpawn: public ITaskSystem {
 };
 
 
-struct ThreadPoolQueueMember {
+struct Task {
     IRunnable* runnable;
     int thread_id;
     int num_total_tasks;
@@ -66,13 +66,13 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
         void sync();
     private:
         int max_threads;
-        std::atomic<int>* free_threads;
-        std::vector<ThreadPoolQueueMember*> queue;
+        std::atomic<int>* busy_threads;
+        std::vector<Task*> queue;
         std::mutex* queue_mutex; // protects the queue
-        static void workerThreadStart(
-            std::vector<ThreadPoolQueueMember*> queue,
+        static void workerThreadFunc(
+            std::vector<Task*> queue,
             std::mutex* queue_mutex, 
-            std::atomic<int>* free_threads
+            std::atomic<int>* busy_threads
         );
         void makeThreadPool();
         void killThreadPool();
