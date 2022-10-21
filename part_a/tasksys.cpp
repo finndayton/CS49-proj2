@@ -108,90 +108,94 @@ const char* TaskSystemParallelThreadPoolSpinning::name() {
     return "Parallel + Thread Pool + Spin";
 }
 
+void workerThreadFunc(
+    TaskSystemParallelThreadPoolSpinning* instance, 
+    int thread_id
+) {
+    // printf("thread %d is starting\n", thread_id);
+    while (!instance->done) {
+        printf("instance->task_queue.size(): %d\n", instance->task_queue.size());
+        if (instance->task_queue.size() > 0) {
+            
+            // acquire mutex and then pop_back
+            instance->task_queue_mutex->lock(); // common mutex for the class
+            if (instance->task_queue.size() == 0) break;
+
+            printf("thread %d successfully acquired the lock\n", thread_id);
+            Task task = instance->task_queue.front();
+            // printf("    to try to run task %d\n", task.task_id);
+            // int task_id = task_queue->front();
+            printf("    to take up task %d\n", task.task_id);
+            instance->task_queue.pop();
+            printf("Now tasks_queue is %ld elements long\n", instance->task_queue.size());
+
+            // parent thread tries to check queue.size() here
+
+            // busy_threads++;
+            instance->task_queue_mutex->unlock();
+            // does it release the mutex now? it should
+            // do something with task
+            auto runnable = task.runnable;
+            // printf("%d", task_id);
+            auto num_total_tasks = task.num_total_tasks;
+            runnable->runTask(task.task_id, num_total_tasks);
+            // busy_threads--;
+        }
+        // printf("thead %d is stuck here while task_queue size = %ld\n", thread_id, instance->task_queue.size());
+    }
+}
+
 TaskSystemParallelThreadPoolSpinning::TaskSystemParallelThreadPoolSpinning(int num_threads): ITaskSystem(num_threads) {
     max_threads = num_threads;
     task_queue_mutex = new std::mutex();
-    busy_threads = 0;
+    done = false;
+
+    // busy_threads = 0;
     // printf("mkaing thread pool");
     // makeThreadPool();
 }
 
 void TaskSystemParallelThreadPoolSpinning::makeThreadPool() {
     for (int i = 0; i < max_threads; i++) {
-        workers.push_back(std::thread(workerThreadFunc, &task_queue, task_queue_mutex, &busy_threads));
+        workers.push_back(std::thread(&workerThreadFunc, this, i));
     }
 }
 
 void TaskSystemParallelThreadPoolSpinning::killThreadPool() {
-    for (unsigned int i = 0; i < workers.size(); i++) {
+    for (int i = 0; i < max_threads; i++) {
         // make threads, and make them free to start off with
         workers[i].join();   
     }
 }
 
 TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning() {
-    // delete task_queue_mutex;
+    done = true;
+    delete task_queue_mutex;
+    killThreadPool();
 }
 
-void TaskSystemParallelThreadPoolSpinning::workerThreadFunc(
-    std::queue<Task>* task_queue,
-    std::mutex* task_queue_mutex, 
-    int* busy_threads
-) {
-    while (true) {
-        if (task_queue->size() > 0) {
-            // acquire mutex and then pop_back
-            task_queue_mutex->lock(); // common mutex for the class
-            printf("acquired lock\n");
-            if (task_queue->size() == 0) break;
-            Task task = task_queue->front();
-            // int task_id = task_queue->front();
-            // printf("took up a task!");
-            task_queue->pop();
-
-            // parent thread tries to check queue.size() here
-
-            *busy_threads++;
-            task_queue_mutex->unlock();
-            // does it release the mutex now? it should
-            // do something with task
-            auto runnable = task.runnable;
-            auto i = task.task_id;
-            // printf("%d", task_id);
-            printf("%d",i);
-            auto num_total_tasks = task.num_total_tasks;
-            runnable->runTask(i, num_total_tasks);
-            *busy_threads--;
-        }
-    }
-
-}
 
 void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_total_tasks) {
     // add tasks to queue, if queue is full, wait until there is space
-    // return;
-    if (workers.size() == 0) {
-        makeThreadPool();
-    } else {
-        printf("thread pool has %d threads already", workers.size());
-    }
-
     for (int i = 0; i < num_total_tasks; i++) {
         Task task = {runnable, i, num_total_tasks};
         task_queue.push(task);
-        
     }
+    printf("just created the task queue. It has %d tasks in it\n", task_queue.size());
+    // return;
+    if (workers.size() == 0) {
+        makeThreadPool();
+    } 
+
     
     
-    while (true) {
-        // waiting...
-        // printf("task_queue size: %d busy_threads: %d\n", task_queue.size(), busy_threads);
-        if (busy_threads == 0 && task_queue.size() == 0){
-            break;
-        }
+    while (task_queue.size() > 0) {
+        // printf("line 191: task_queue size: %d\n", task_queue.size());
     }
+    // printf("end of run reached");
 
 }
+
 
 TaskID TaskSystemParallelThreadPoolSpinning::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                                               const std::vector<TaskID>& deps) {

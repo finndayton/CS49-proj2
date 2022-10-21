@@ -629,10 +629,11 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
         } else {
             // printf("hi\n");
             // printf((const char*)t);
-            // if (t->name()=="Parallel + Thread Pool + Spin") {
-            //     printf("t->run(runnables[%d], num_tasks);", i);
-            // }
             t->run(runnables[i], num_tasks);
+            if (t->name()=="Parallel + Thread Pool + Spin") {
+                printf("t->run(runnables[%d], num_tasks);", i);
+            }
+            // printf("run finsihed running\n")
         }
     }
     if (do_async)
