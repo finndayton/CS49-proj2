@@ -69,6 +69,7 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
         int max_threads;
         // int busy_threads;
         std::queue<Task> task_queue;
+        int debug;
         std::mutex* task_queue_mutex; // protects the queue
         // void workerThreadFunc(
         //     int thread_id

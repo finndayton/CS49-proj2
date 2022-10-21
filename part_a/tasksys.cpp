@@ -114,11 +114,12 @@ void workerThreadFunc(
 ) {
     // printf("thread %d is starting\n", thread_id);
     while (!instance->done) {
-        printf("instance->task_queue.size(): %d\n", instance->task_queue.size());
+        instance->task_queue_mutex->lock(); // common mutex for the class
+        // printf("instance->task_queue.size(): %d\n", instance->task_queue.size());
+        // printf("debug: %d\n", instance->debug);
         if (instance->task_queue.size() > 0) {
             
             // acquire mutex and then pop_back
-            instance->task_queue_mutex->lock(); // common mutex for the class
             if (instance->task_queue.size() == 0) break;
 
             printf("thread %d successfully acquired the lock\n", thread_id);
@@ -127,6 +128,7 @@ void workerThreadFunc(
             // int task_id = task_queue->front();
             printf("    to take up task %d\n", task.task_id);
             instance->task_queue.pop();
+            instance->debug--;
             printf("Now tasks_queue is %ld elements long\n", instance->task_queue.size());
 
             // parent thread tries to check queue.size() here
@@ -140,6 +142,8 @@ void workerThreadFunc(
             auto num_total_tasks = task.num_total_tasks;
             runnable->runTask(task.task_id, num_total_tasks);
             // busy_threads--;
+        } else {
+            instance->task_queue_mutex->unlock();
         }
         // printf("thead %d is stuck here while task_queue size = %ld\n", thread_id, instance->task_queue.size());
     }
@@ -149,6 +153,7 @@ TaskSystemParallelThreadPoolSpinning::TaskSystemParallelThreadPoolSpinning(int n
     max_threads = num_threads;
     task_queue_mutex = new std::mutex();
     done = false;
+    debug = 0;
 
     // busy_threads = 0;
     // printf("mkaing thread pool");
@@ -175,11 +180,16 @@ TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning() {
 }
 
 
+// what we know: run() is called once and fucks up on the first call. spins. 
+// task_queue in main thread is not zero?
 void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_total_tasks) {
     // add tasks to queue, if queue is full, wait until there is space
+    printf("run() called with num_total_tasks = %d", num_total_tasks);
     for (int i = 0; i < num_total_tasks; i++) {
         Task task = {runnable, i, num_total_tasks};
         task_queue.push(task);
+        printf("run called! incrementing debug from %d to %d\n", debug, debug + 1);
+        debug++;
     }
     printf("just created the task queue. It has %d tasks in it\n", task_queue.size());
     // return;
@@ -187,12 +197,13 @@ void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_tota
         makeThreadPool();
     } 
 
-    
-    
+    printf("debug: %d\n", debug);
+    printf("Hello\n");
     while (task_queue.size() > 0) {
-        // printf("line 191: task_queue size: %d\n", task_queue.size());
+        // printf("line 191 spinning. Task_queue size: %d\n", task_queue.size());
+        printf("line 191 spinning\n");
     }
-    // printf("end of run reached");
+    printf("end of run reached\n");
 
 }
 
