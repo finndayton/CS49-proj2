@@ -618,7 +618,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
     double start_time = CycleTimer::currentSeconds();
     TaskID prev_task_id;
     for (int i=0; i<num_bulk_task_launches; i++) {
-        printf("here\n");
+        // printf("here\n");
         if (do_async) {
             std::vector<TaskID> deps;
             if (i > 0) {
@@ -629,10 +629,10 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
         } else {
             // printf("hi\n");
             // printf((const char*)t);
-            if (t->name()=="Parallel + Thread Pool + Spin\n") {
-                printf("t->run(runnables[%d], num_tasks);", i);
-            }
-            // t->run(runnables[i], num_tasks);
+            // if (t->name()=="Parallel + Thread Pool + Spin") {
+            //     printf("t->run(runnables[%d], num_tasks);", i);
+            // }
+            t->run(runnables[i], num_tasks);
         }
     }
     if (do_async)
