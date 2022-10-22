@@ -212,7 +212,7 @@ void workerThreadFuncSleeping(
         std::unique_lock<std::mutex> lk(*(instance->mutex_));
         // printf("thread %d waiting\n", thread_id);
         // keep waiting while task queue is empty or we are done
-        while(!instance->done && instance->task_queue.size() == 0) {
+        while(instance->task_queue.size() == 0) {
             instance->condition_variable_->wait(lk);
         }
         // printf("thread %d acquired lock\n", thread_id);
