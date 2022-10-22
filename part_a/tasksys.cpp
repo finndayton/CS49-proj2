@@ -205,14 +205,14 @@ void workerThreadFuncSleeping(
     TaskSystemParallelThreadPoolSleeping* instance, 
     int thread_id
 ) {
-    while (!instance->done) {
+    while (true) {
         // how do we know its time to kill the thread?
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
         std::unique_lock<std::mutex> lk(*(instance->mutex_));
         // printf("thread %d waiting\n", thread_id);
         // keep waiting while task queue is empty or we are done
-        while(instance->task_queue.size() == 0) {
+        while(!instance->done && instance->task_queue.size() == 0) {
             instance->condition_variable_->wait(lk);
         }
         // printf("thread %d acquired lock\n", thread_id);
