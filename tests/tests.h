@@ -626,7 +626,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
             prev_task_id = t->runAsyncWithDeps(
                 runnables[i], num_tasks, deps);
         } else {
-            printf("Running bulk task launch %d\n", i);
+            printf("Running bulk task launch %d of %d\n", i, num_bulk_task_launches);
             t->run(runnables[i], num_tasks);
         }
     }
@@ -669,6 +669,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
 TestResults superSuperLightTest(ITaskSystem* t) {
     int num_elements = 32 * 1024;
     int base_iters = 0;
+    printf("running super super light\n")
     return pingPongTest(t, true, false, num_elements, base_iters);
 }
 
