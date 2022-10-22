@@ -288,24 +288,17 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     // signalling thread must spin until all tasks are done
     while (true) {
         // have this guy wait on the condition variable to check as well
-        
         // lock to check task_queue size
         // printf("busy threads: %d, task_queue: %d \n", busy_threads.load(), task_queue.size());
         // printf("main thread waiting\n");
         // we need to automagically release this lock when it goes out of scope - that's why the while true
         std::unique_lock<std::mutex> lk(*mutex_);
-        
-        // printf("main thread got lock\n");
-        // printf("task queue size is %ld\n", task_queue.size());
-        // printf("busy threads is %d\n", busy_threads.load());
+        condition_variable_->wait(lk, [this] {return done || (busy_threads == 0 && task_queue.size() == 0);});
         if (task_queue.size() == 0 && busy_threads == 0) {
             // no more work to be done, return from run
             lk.unlock();
-            // printf("run is returning\n");
             return;
         } else {
-            // work remains, let someone else have the lock
-            // std::unique_lock<std::mutex> lk(*mutex_);
             lk.unlock();
             condition_variable_->notify_all();
         }
