@@ -251,12 +251,12 @@ void workerThreadFuncSleeping(
         // how do we know its time to kill the thread?
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
-        // std::unique_lock<std::mutex> lk(*(instance->mutex_));
-        // printf("thread %d waiting\n", thread_id);
-        // instance->condition_variable_->wait(lk);
-        // printf("thread %d awoken\n", thread_id);
+        std::unique_lock<std::mutex> lk(*(instance->mutex_));
+        printf("thread %d waiting\n", thread_id);
+        instance->condition_variable_->wait(lk);
+        printf("thread %d awoken and mutex reacquired \n", thread_id);
         if (instance->done) {
-            // printf("thread %d exiting\n", thread_id);
+            printf("thread %d exiting\n", thread_id);
             // lock goes out of scope so its released
             return;
         }
@@ -264,12 +264,11 @@ void workerThreadFuncSleeping(
         if (instance->task_queue.size() == 0) {
             continue;
         }
-        // lock is now re-acquired
         // do the work in the critical section
         instance->busy_threads++;
         Task task = instance->task_queue.front();
         instance->task_queue.pop();
-        // lk.unlock();
+        lk.unlock();
         // let someone else have the lock
         instance->condition_variable_->notify_all();
 
@@ -279,7 +278,6 @@ void workerThreadFuncSleeping(
         runnable->runTask(task.task_id, num_total_tasks);
         instance->busy_threads--;
     }
-    // printf("thread %d exiting\n", thread_id);
 }
 
 void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
@@ -291,9 +289,10 @@ void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
 void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
     // trick was to have the lock while some waiting thread that had it
     // released it, then notify all and let them take the lock back. 
-    // std::unique_lock<std::mutex> lk(*mutex_);
+    std::unique_lock<std::mutex> lk(*mutex_);
+    done = true;
     condition_variable_->notify_all();
-    // lk.unlock();
+    lk.unlock();
     for (int i = 0; i < max_threads; i++) {
         // make threads, and make them free to start off with
         workers[i].join();   
@@ -301,7 +300,6 @@ void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
 }
 
 TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
-    done = true;
     killThreadPool();
     delete condition_variable_;
     delete mutex_;
