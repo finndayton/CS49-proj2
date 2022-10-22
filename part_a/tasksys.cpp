@@ -258,6 +258,7 @@ void workerThreadFuncSleeping(
         while(!instance->done && instance->task_queue.size() == 0) {
             instance->condition_variable_->wait(lk);
         }
+        printf("thread %d acquired lock\n", thread_id);
         if (instance->done) {
             printf("thread %d exiting\n", thread_id);
             return;
@@ -267,7 +268,7 @@ void workerThreadFuncSleeping(
         Task task = instance->task_queue.front();
         instance->task_queue.pop();
         lk.unlock();
-
+        printf("thread %d released lock\n", thread_id);
         // let someone else have the lock
         instance->condition_variable_->notify_all();
         // do actual run
@@ -275,11 +276,13 @@ void workerThreadFuncSleeping(
         auto num_total_tasks = task.num_total_tasks;
         runnable->runTask(task.task_id, num_total_tasks);
         lk.lock();
+        printf("thread %d acquired lock for updating busy_threads \n", thread_id);
         // even if the shared variable is atomic, it must be modified 
         // under the mutex in order to correctly pusblish the modification
         // to the waiting thread
         instance->busy_threads--;
         lk.unlock();
+        printf("thread %d released lock after updating busy_threads \n", thread_id);
         instance->condition_variable_->notify_all();
 
     }
