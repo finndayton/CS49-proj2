@@ -328,7 +328,7 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     // signalling thread must spin until all tasks are done
     while (true) {
         // lock to check task_queue size
-        printf("busy threads: %d\n", busy_threads.load());
+        printf("busy threads: %d, task_queue: %d \n", busy_threads.load(), task_queue.size());
         printf("main thread waiting\n");
         mutex_->lock();
         printf("main thread got lock\n");
