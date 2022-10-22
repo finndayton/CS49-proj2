@@ -291,7 +291,10 @@ void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
 void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
     // don't need the lock, just notify all so they can exit
     // might need to do some gymnastics with the lock
+    // try acquiring and then releasing the lock?
+    std::unique_lock<std::mutex> lk(*mutex_);
     condition_variable_->notify_all();
+    lk.unlock();
     for (int i = 0; i < max_threads; i++) {
         // make threads, and make them free to start off with
         workers[i].join();   
