@@ -301,7 +301,7 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     mutex_->lock();
     while (task_queue.size() > 0 || busy_threads > 0) {
         mutex_->unlock();
-        printf("task queue now has %ul tasks\n", task_queue.size());
+        printf("task queue now has %lu tasks\n", task_queue.size());
         // release the mutex before calling notify_all to make sure waiting threads have a chance 
         // to make progress
         condition_variable_->notify_all();
