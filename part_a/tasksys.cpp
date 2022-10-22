@@ -333,20 +333,21 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
         // lock to check task_queue size
         printf("busy threads: %d, task_queue: %d \n", busy_threads.load(), task_queue.size());
         printf("main thread waiting\n");
-        mutex_->lock();
+        // we need to automagically release this lock when it goes out of scope
+        std::unique_lock<std::mutex> lk(*mutex_);
         printf("main thread got lock\n");
         // printf("task queue size is %ld\n", task_queue.size());
         // printf("busy threads is %d\n", busy_threads.load());
         if (task_queue.size() == 0 && busy_threads == 0) {
             // no more work to be done, return from run
-            mutex_->unlock();
+            lk.unlock();
             printf("run is returning\n");
             return;
         } else {
             // work remains, let someone else have the lock
             // std::unique_lock<std::mutex> lk(*mutex_);
             condition_variable_->notify_all();
-            // lk.unlock();
+            lk.unlock();
         }
     }
 }
