@@ -265,6 +265,9 @@ void workerThreadFuncSleeping(
         Task task = instance->task_queue.front();
         instance->task_queue.pop();
         lk.unlock();
+        // let someone else have the lock
+        instance->condition_variable_->notify_all();
+        
         // do actual run
         auto runnable = task.runnable;
         auto num_total_tasks = task.num_total_tasks;
