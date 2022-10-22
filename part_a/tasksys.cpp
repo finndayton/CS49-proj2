@@ -68,6 +68,8 @@ TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
 
 void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
     std::thread workers[max_threads_];
+    // keep a global hashmap of tasks, each individual thread can pick up whatever it wants to
+    // once done with its own work?
     for (int i = 0; i < max_threads_; i++) {
         workers[i] = std::thread(thread_worker_function, runnable, i, max_threads_, num_total_tasks);
     }
@@ -292,20 +294,20 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
         // printf("busy threads: %d, task_queue: %d \n", busy_threads.load(), task_queue.size());
         // printf("main thread waiting\n");
         // we need to automagically release this lock when it goes out of scope
-        std::unique_lock<std::mutex> lk(*mutex_);
+        // std::unique_lock<std::mutex> lk(*mutex_);
         // printf("main thread got lock\n");
         // printf("task queue size is %ld\n", task_queue.size());
         // printf("busy threads is %d\n", busy_threads.load());
         if (task_queue.size() == 0 && busy_threads == 0) {
             // no more work to be done, return from run
-            lk.unlock();
+            // lk.unlock();
             // printf("run is returning\n");
             return;
         } else {
             // work remains, let someone else have the lock
             // std::unique_lock<std::mutex> lk(*mutex_);
-            condition_variable_->notify_all();
-            lk.unlock();
+            // condition_variable_->notify_all();
+            // lk.unlock();
         }
     }
 }
