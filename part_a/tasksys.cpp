@@ -57,66 +57,20 @@ TaskSystemParallelSpawn::TaskSystemParallelSpawn(int num_threads): ITaskSystem(n
 }
 
 static inline void thread_worker_function(IRunnable* runnable, int thread_id, int num_threads, int num_total_tasks) {
-    // int task_id = thread_id;
-    // while (task_id < num_total_tasks) {
-    //     runnable->runTask(task_id, num_total_tasks);
-    //     task_id += num_threads;
-    // }
-    int tasks_per_thread = num_total_tasks / num_threads;
-
-    // task_id should be from 0 to num_total_tasks - 1
-    int task_id_start = thread_id * tasks_per_thread;
-    int task_id_end = task_id_start + tasks_per_thread;
-    
-    /* 
-    Case where num_total_tasks % num_threads != 0
-    Example: num_total_tasks = 15
-             num_threads     = 8
-    In this case, we launch 8 threads. The 8 thread worker functions receive thread_ids {0, 1, 2...7}
-    But, tasks_per_thread for each thread worker is only 1 (15 / 8 = 1). This means the last thread, thread_id = 7,
-    is going to have to pick up the slack and, instead of just completing the 8th task, do task 8, 9, 10...15. That's right. 
-    This means that if (thread_id == num_threads - 1) AND num_total_tasks % num_threads != 0, we must update 
-    task_id_end to include tasks 9, 10, 11, 12...15. (7 more tasks). This is num_total_tasks % num_threads MORE tasks 
-    */ 
-
-    // printf("num_total_tasks: %d, num threads: %d, tasks_per_thread: %d, thread_id: %d, task_id_start: %d, task_id_end: %d\n", num_total_tasks, num_threads, tasks_per_thread, thread_id, task_id_start, task_id_end);
-
-    if (thread_id == num_threads - 1 && num_total_tasks % num_threads != 0) {
-        task_id_end += num_total_tasks % num_threads;
-    }
-    for (int i = task_id_start; i < task_id_end; i++) {
-        runnable->runTask(i, num_total_tasks);
+    int task_id = thread_id;
+    while (task_id < num_total_tasks) {
+        runnable->runTask(task_id, num_total_tasks);
+        task_id += num_threads;
     }
 }
 
 TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
 
 void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
-    // printf("max_threads_: %d\n", max_threads_);
-
-
-    //
-    // TODO: CS149 students will modify the implementation of this
-    // method in Part A. The implementation provided below runs all
-    // tasks sequentially on the calling thread.
-
-    // Make up to std::min(num_threads,  num_total_tasks) number of threads
-    // each thread gets a certain contiguous chunk of the total work.
-
-    // runnable is, for example, a PingPongTask class instance, which extends IRunnable. 
-    // PingPongTask's implementation of runTask() is to fill an output array, from an input array, etc. 
-    // For this super_light test, our run() function is called 400 times (400 bulk task launches)
-    // with each launch containing 64 tasks to be done. num_elements = 32 * 1024;
-    // and n_iters = 32. We and to parallelize these 64 tasks using num_thread threads. 
-    // 
-
     std::thread workers[max_threads_];
     for (int i = 0; i < max_threads_; i++) {
         workers[i] = std::thread(thread_worker_function, runnable, i, max_threads_, num_total_tasks);
     }
-    // handle case where (num_total_tasks / num_threads) is something like 258 / 8 = 32 tasks for
-    // the 8 threads + 2 tasks left over. This means the 8th thread (i == 7) 
-
     for (int i = 0; i < max_threads_; i++) {
         workers[i].join();
     }
