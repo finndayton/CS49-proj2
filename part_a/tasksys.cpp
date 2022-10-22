@@ -242,9 +242,34 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     max_threads = num_threads;
 }
 
+
+void workerThreadFuncSleeping(
+    TaskSystemParallelThreadPoolSleeping* instance, 
+    int thread_id
+) {
+    while (!instance->done) {
+        // how do we know its time to kill the thread?
+        // a lock must be held in order to wait on a condition variable
+        // always awoken because of notify_all from main thread, which is fine
+        std::unique_lock<std::mutex> lk(*(instance->mutex_));
+        instance->condition_variable_->wait(lk);
+        // lock is now re-acquired
+        // do the work in the critical section
+        instance->busy_threads++;
+        Task task = instance->task_queue.front();
+        instance->task_queue.pop();
+        lk.unlock();
+        // do actual run
+        auto runnable = task.runnable;
+        auto num_total_tasks = task.num_total_tasks;
+        runnable->runTask(task.task_id, num_total_tasks);
+        instance->busy_threads--;
+    }
+}
+
 void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
     for (int i = 0; i < max_threads; i++) {
-        workers.push_back(std::thread(&workerThreadFunc, this, i));
+        workers.push_back(std::thread(&workerThreadFuncSleeping, this, i));
     }
 }
 
@@ -260,30 +285,6 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     killThreadPool();
     delete condition_variable_;
     delete mutex_;
-}
-
-void workerThreadFunc(
-    TaskSystemParallelThreadPoolSleeping* instance, 
-    int thread_id
-) {
-    while (!instance->done) {
-        // how do we know its time to kill the thread?
-        // a lock must be held in order to wait on a condition variable
-        // always awoken because of notify_all from main thread, which is fine
-        std::unique_lock<std::mutex> lk(instance->mutex_);
-        instance->condition_variable_->wait(lk);
-        // lock is now re-acquired
-        // do the work in the critical section
-        instance->busy_threads++;
-        Task task = instance->task_queue.front();
-        instance->task_queue.pop();
-        lk.unlock();
-        // do actual run
-        auto runnable = task.runnable;
-        auto num_total_tasks = task.num_total_tasks;
-        runnable->runTask(task.task_id, num_total_tasks);
-        instance->busy_threads--;
-    }
 }
 
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
