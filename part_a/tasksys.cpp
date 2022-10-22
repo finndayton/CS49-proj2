@@ -153,7 +153,6 @@ void workerThreadFunc(
 
             auto runnable = task.runnable;
             auto num_total_tasks = task.num_total_tasks;
-            printf("runTask(task.task_id = %d, num_total_tasks = %d);\n", task.task_id, num_total_tasks);
             runnable->runTask(task.task_id, num_total_tasks);
 
 
