@@ -252,11 +252,11 @@ void workerThreadFuncSleeping(
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
         std::unique_lock<std::mutex> lk(*(instance->mutex_));
-        printf("thread %d waiting\n", thread_id);
+        // printf("thread %d waiting\n", thread_id);
         instance->condition_variable_->wait(lk);
-        printf("thread %d awoken\n", thread_id);
+        // printf("thread %d awoken\n", thread_id);
         if (instance->done) {
-            printf("thread %d exiting\n", thread_id);
+            // printf("thread %d exiting\n", thread_id);
             // lock goes out of scope so its released
             return;
         }
@@ -279,7 +279,7 @@ void workerThreadFuncSleeping(
         runnable->runTask(task.task_id, num_total_tasks);
         instance->busy_threads--;
     }
-    printf("thread %d exiting\n", thread_id);
+    // printf("thread %d exiting\n", thread_id);
 }
 
 void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
