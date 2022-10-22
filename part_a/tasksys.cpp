@@ -105,10 +105,6 @@ void workerThreadFunc(
         std::unique_lock<std::mutex> lk(*(instance->task_queue_mutex));
         if (instance->task_queue.size() > 0) {
             instance->busy_threads++;
-            // it would segfault here if 
-            // task_queue is null perhaps?
-            // or if task_queue is empty?
-            printf("task queue size: %d", instance->task_queue.size());
             Task task = instance->task_queue.front();
             instance->task_queue.pop();
             lk.unlock();
