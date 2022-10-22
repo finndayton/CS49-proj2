@@ -256,6 +256,7 @@ void workerThreadFuncSleeping(
         instance->condition_variable_->wait(lk);
         printf("thread %d awoken\n", thread_id);
         if (instance->done) {
+            printf("thread %d exiting\n", thread_id);
             // lock goes out of scope so its released
             return;
         }
