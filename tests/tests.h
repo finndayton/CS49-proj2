@@ -669,7 +669,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
 TestResults superSuperLightTest(ITaskSystem* t) {
     int num_elements = 32 * 1024;
     int base_iters = 0;
-    printf("running super super light\n")
+    printf("running super super light\n");
     return pingPongTest(t, true, false, num_elements, base_iters);
 }
 
