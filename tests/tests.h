@@ -743,7 +743,7 @@ TestResults recursiveFibonacciTestBase(ITaskSystem* t, bool do_async) {
         t->sync();
     } else {
         for (int i = 0; i < num_bulk_task_launches; i++) {
-            printf("Running bulk task launch %d of %d\n", i, num_bulk_task_launches);
+            // printf("Running bulk task launch %d of %d\n", i, num_bulk_task_launches);
             t->run(fib_tasks[i], num_tasks);
         }
     }

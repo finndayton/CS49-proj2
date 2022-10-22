@@ -141,25 +141,22 @@ void workerThreadFunc(
     int thread_id
 ) {    
     while (!instance->done) {
-
-        instance->task_queue_mutex->lock(); // common mutex for the class
-
+        std::unique_lock<std::mutex> lk(*(instance->task_queue_mutex));
         if (instance->task_queue.size() > 0) {
             instance->busy_threads++;
             Task task = instance->task_queue.front();
             instance->task_queue.pop();
-
-            instance->task_queue_mutex->unlock();
+            lk.unlock();
 
             auto runnable = task.runnable;
             auto num_total_tasks = task.num_total_tasks;
             runnable->runTask(task.task_id, num_total_tasks);
 
-
+            lk.lock();
             instance->busy_threads--;
-
+            lk.unlock();
         } else {
-            instance->task_queue_mutex->unlock();
+            lk.unlock();
         }
     }
 }
@@ -318,6 +315,8 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
 }
 
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
+    // its not possible to have a task_id > num_total_tasks
+    // unless we're looking at garbage data
     for (int i = 0; i < num_total_tasks; i++) {
         Task task = {runnable, i, num_total_tasks}; //task_id is set to i {0, 1, 2, ... , num_total_tasks - 1}
         task_queue.push(task);
