@@ -291,7 +291,7 @@ void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
 void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
     // trick was to have the lock while some waiting thread that had it
     // released it, then notify all and let them take the lock back. 
-    std::unique_lock<std::mutex> lk(*mutex_);
+    // std::unique_lock<std::mutex> lk(*mutex_);
     condition_variable_->notify_all();
     lk.unlock();
     for (int i = 0; i < max_threads; i++) {
@@ -330,9 +330,9 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
             return;
         } else {
             // let someone else have the lock
-            std::unique_lock<std::mutex> lk(*mutex_);
+            // std::unique_lock<std::mutex> lk(*mutex_);
             condition_variable_->notify_all();
-            lk.unlock();
+            // lk.unlock();
         }
     }
 }
