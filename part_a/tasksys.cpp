@@ -251,9 +251,9 @@ void workerThreadFuncSleeping(
         // how do we know its time to kill the thread?
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
-        std::unique_lock<std::mutex> lk(*(instance->mutex_));
+        // std::unique_lock<std::mutex> lk(*(instance->mutex_));
         // printf("thread %d waiting\n", thread_id);
-        instance->condition_variable_->wait(lk);
+        // instance->condition_variable_->wait(lk);
         // printf("thread %d awoken\n", thread_id);
         if (instance->done) {
             // printf("thread %d exiting\n", thread_id);
@@ -269,7 +269,7 @@ void workerThreadFuncSleeping(
         instance->busy_threads++;
         Task task = instance->task_queue.front();
         instance->task_queue.pop();
-        lk.unlock();
+        // lk.unlock();
         // let someone else have the lock
         instance->condition_variable_->notify_all();
 
