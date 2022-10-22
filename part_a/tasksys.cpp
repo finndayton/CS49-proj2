@@ -74,6 +74,8 @@ static inline void thread_worker_function(IRunnable* runnable, int thread_id, in
     task_id_end to include tasks 9, 10, 11, 12...15. (7 more tasks). This is num_total_tasks % num_threads MORE tasks 
     */ 
 
+    printf("num_total_tasks: %d, num threads: %d, tasks_per_thread: %d, thread_id: %d, task_id_start: %d, task_id_end: %d", num_total_tasks, num_threads, tasks_per_thread, thread_id, task_id_start, task_id_end);
+
     if (thread_id == num_threads - 1 && num_total_tasks % num_threads != 0) {
         task_id_end += num_total_tasks % num_threads;
     }
