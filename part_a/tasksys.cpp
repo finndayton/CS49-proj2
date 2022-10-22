@@ -233,6 +233,8 @@ void workerThreadFuncSleeping(
         auto num_total_tasks = task.num_total_tasks;
         runnable->runTask(task.task_id, num_total_tasks);
         runnable->runTask(task.task_id + 1, num_total_tasks);
+        runnable->runTask(task.task_id + 2, num_total_tasks);
+        runnable->runTask(task.task_id + 3, num_total_tasks);
 
         // its possible we still need the lock to do this atomic update
         // lk.lock();
@@ -277,7 +279,7 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
     // its not possible to have a task_id > num_total_tasks
     // unless we're looking at garbage data
-    for (int i = 0; i < num_total_tasks; i=i+2) {
+    for (int i = 0; i < num_total_tasks; i=i+4) {
         Task task = {runnable, i, num_total_tasks}; //task_id is set to i {0, 1, 2, ... , num_total_tasks - 1}
         task_queue.push(task);
     }
