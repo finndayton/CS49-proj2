@@ -253,6 +253,10 @@ void workerThreadFuncSleeping(
         // always awoken because of notify_all from main thread, which is fine
         std::unique_lock<std::mutex> lk(*(instance->mutex_));
         instance->condition_variable_->wait(lk);
+        // if task queue is empty, just continue
+        if (instance->task_queue.size() == 0) {
+            continue;
+        }
         // lock is now re-acquired
         // do the work in the critical section
         instance->busy_threads++;
