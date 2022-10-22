@@ -188,6 +188,7 @@ void TaskSystemParallelThreadPoolSpinning::makeThreadPool() {
 void TaskSystemParallelThreadPoolSpinning::killThreadPool() {
     for (int i = 0; i < max_threads; i++) {
         // make threads, and make them free to start off with
+        printf("joining thread %d\n", i);
         workers[i].join();   
     }
 }
