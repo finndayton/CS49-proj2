@@ -305,7 +305,7 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     while (true) {
         // lock to check task_queue size
         mutex_->lock();
-        printf("task queue size is %d\n", task_queue.size());
+        printf("task queue size is %ld\n", task_queue.size());
         printf("busy threads is %d\n", busy_threads.load());
         if (task_queue.size() == 0 && busy_threads == 0) {
             // no more work to be done, return from run
