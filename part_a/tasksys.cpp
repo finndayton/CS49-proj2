@@ -293,7 +293,10 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
         // printf("main thread waiting\n");
         // we need to automagically release this lock when it goes out of scope - that's why the while true
         std::unique_lock<std::mutex> lk(*mutex_);
-        condition_variable_->wait(lk, [this] {return done || (busy_threads == 0 && task_queue.size() == 0);});
+        
+        while (busy_threads > 0) condition_variable_->wait(lk);
+        // condition_variable_->wait(lk, [this] {return done || (busy_threads == 0 && task_queue.size() == 0);});
+        
         if (task_queue.size() == 0 && busy_threads == 0) {
             // no more work to be done, return from run
             lk.unlock();
