@@ -275,14 +275,14 @@ void workerThreadFuncSleeping(
         auto runnable = task.runnable;
         auto num_total_tasks = task.num_total_tasks;
         runnable->runTask(task.task_id, num_total_tasks);
-        lk.lock();
-        printf("thread %d acquired lock for updating busy_threads \n", thread_id);
+        // lk.lock();
+        // printf("thread %d acquired lock for updating busy_threads \n", thread_id);
         // even if the shared variable is atomic, it must be modified 
         // under the mutex in order to correctly pusblish the modification
         // to the waiting thread
         instance->busy_threads--;
-        lk.unlock();
-        printf("thread %d released lock after updating busy_threads \n", thread_id);
+        // lk.unlock();
+        // printf("thread %d released lock after updating busy_threads \n", thread_id);
         instance->condition_variable_->notify_all();
 
     }
