@@ -57,31 +57,36 @@ TaskSystemParallelSpawn::TaskSystemParallelSpawn(int num_threads): ITaskSystem(n
 }
 
 static inline void thread_worker_function(IRunnable* runnable, int thread_id, int num_threads, int num_total_tasks) {
-    int tasks_per_thread = num_total_tasks / num_threads;
+    int task_id = thread_id;
+    while (task_id < num_total_tasks) {
+        runnable->runTask(task_id, num_total_tasks);
+        task_id += num_threads;
+    }
+    // int tasks_per_thread = num_total_tasks / num_threads;
 
-    // task_id should be from 0 to num_total_tasks - 1
-    int task_id_start = thread_id * tasks_per_thread;
-    int task_id_end = task_id_start + tasks_per_thread;
+    // // task_id should be from 0 to num_total_tasks - 1
+    // int task_id_start = thread_id * tasks_per_thread;
+    // int task_id_end = task_id_start + tasks_per_thread;
     
-    /* 
-    Case where num_total_tasks % num_threads != 0
-    Example: num_total_tasks = 15
-             num_threads     = 8
-    In this case, we launch 8 threads. The 8 thread worker functions receive thread_ids {0, 1, 2...7}
-    But, tasks_per_thread for each thread worker is only 1 (15 / 8 = 1). This means the last thread, thread_id = 7,
-    is going to have to pick up the slack and, instead of just completing the 8th task, do task 8, 9, 10...15. That's right. 
-    This means that if (thread_id == num_threads - 1) AND num_total_tasks % num_threads != 0, we must update 
-    task_id_end to include tasks 9, 10, 11, 12...15. (7 more tasks). This is num_total_tasks % num_threads MORE tasks 
-    */ 
+    // /* 
+    // Case where num_total_tasks % num_threads != 0
+    // Example: num_total_tasks = 15
+    //          num_threads     = 8
+    // In this case, we launch 8 threads. The 8 thread worker functions receive thread_ids {0, 1, 2...7}
+    // But, tasks_per_thread for each thread worker is only 1 (15 / 8 = 1). This means the last thread, thread_id = 7,
+    // is going to have to pick up the slack and, instead of just completing the 8th task, do task 8, 9, 10...15. That's right. 
+    // This means that if (thread_id == num_threads - 1) AND num_total_tasks % num_threads != 0, we must update 
+    // task_id_end to include tasks 9, 10, 11, 12...15. (7 more tasks). This is num_total_tasks % num_threads MORE tasks 
+    // */ 
 
-    printf("num_total_tasks: %d, num threads: %d, tasks_per_thread: %d, thread_id: %d, task_id_start: %d, task_id_end: %d\n", num_total_tasks, num_threads, tasks_per_thread, thread_id, task_id_start, task_id_end);
+    // printf("num_total_tasks: %d, num threads: %d, tasks_per_thread: %d, thread_id: %d, task_id_start: %d, task_id_end: %d\n", num_total_tasks, num_threads, tasks_per_thread, thread_id, task_id_start, task_id_end);
 
-    if (thread_id == num_threads - 1 && num_total_tasks % num_threads != 0) {
-        task_id_end += num_total_tasks % num_threads;
-    }
-    for (int i = task_id_start; i < task_id_end; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
+    // if (thread_id == num_threads - 1 && num_total_tasks % num_threads != 0) {
+    //     task_id_end += num_total_tasks % num_threads;
+    // }
+    // for (int i = task_id_start; i < task_id_end; i++) {
+    //     runnable->runTask(i, num_total_tasks);
+    // }
 }
 
 TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
@@ -105,12 +110,10 @@ void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
     // and n_iters = 32. We and to parallelize these 64 tasks using num_thread threads. 
     // 
 
-    int num_threads = std::min(max_threads_, num_total_tasks);
-    std::thread workers[num_threads];
-    for (int i = 0; i < num_threads; i++) {
+    std::thread workers[max_threads_];
+    for (int i = 0; i < max_threads_; i++) {
         workers[i] = std::thread(thread_worker_function, runnable, i, num_threads, num_total_tasks);
     }
-
     // handle case where (num_total_tasks / num_threads) is something like 258 / 8 = 32 tasks for
     // the 8 threads + 2 tasks left over. This means the 8th thread (i == 7) 
 
