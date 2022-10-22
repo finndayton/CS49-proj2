@@ -626,6 +626,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
             prev_task_id = t->runAsyncWithDeps(
                 runnables[i], num_tasks, deps);
         } else {
+            printf("Running bulk task launch %d\n", i);
             t->run(runnables[i], num_tasks);
         }
     }
