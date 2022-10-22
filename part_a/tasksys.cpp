@@ -289,9 +289,8 @@ void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
 }
 
 void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
-    // don't need the lock, just notify all so they can exit
-    // might need to do some gymnastics with the lock
-    // try acquiring and then releasing the lock?
+    // trick was to have the lock while some waiting thread that had it
+    // released it, then notify all and let them take the lock back
     std::unique_lock<std::mutex> lk(*mutex_);
     condition_variable_->notify_all();
     lk.unlock();
