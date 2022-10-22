@@ -117,7 +117,7 @@ void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
     // handle case where (num_total_tasks / num_threads) is something like 258 / 8 = 32 tasks for
     // the 8 threads + 2 tasks left over. This means the 8th thread (i == 7) 
 
-    for (int i = 0; i < num_threads; i++) {
+    for (int i = 0; i < max_threads_; i++) {
         workers[i].join();
     }
 }
