@@ -112,7 +112,7 @@ void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
 
     std::thread workers[max_threads_];
     for (int i = 0; i < max_threads_; i++) {
-        workers[i] = std::thread(thread_worker_function, runnable, i, num_threads, num_total_tasks);
+        workers[i] = std::thread(thread_worker_function, runnable, i, max_threads_, num_total_tasks);
     }
     // handle case where (num_total_tasks / num_threads) is something like 258 / 8 = 32 tasks for
     // the 8 threads + 2 tasks left over. This means the 8th thread (i == 7) 
