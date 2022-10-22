@@ -188,7 +188,7 @@ void TaskSystemParallelThreadPoolSpinning::makeThreadPool() {
 void TaskSystemParallelThreadPoolSpinning::killThreadPool() {
     for (int i = 0; i < max_threads; i++) {
         // make threads, and make them free to start off with
-        printf("joining thread %d\n", i);
+        // printf("joining thread %d\n", i);
         workers[i].join();   
     }
 }
@@ -253,14 +253,14 @@ void workerThreadFuncSleeping(
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
         std::unique_lock<std::mutex> lk(*(instance->mutex_));
-        printf("thread %d waiting\n", thread_id);
+        // printf("thread %d waiting\n", thread_id);
         // keep waiting while task queue is empty or we are done
         while(!instance->done && instance->task_queue.size() == 0) {
             instance->condition_variable_->wait(lk);
         }
-        printf("thread %d acquired lock\n", thread_id);
+        // printf("thread %d acquired lock\n", thread_id);
         if (instance->done) {
-            printf("thread %d exiting\n", thread_id);
+            // printf("thread %d exiting\n", thread_id);
             return;
         }
         // do the work in the critical section
@@ -268,13 +268,14 @@ void workerThreadFuncSleeping(
         Task task = instance->task_queue.front();
         instance->task_queue.pop();
         lk.unlock();
-        printf("thread %d released lock\n", thread_id);
+        // printf("thread %d released lock\n", thread_id);
         // let someone else have the lock
         instance->condition_variable_->notify_all();
         // do actual run
         auto runnable = task.runnable;
         auto num_total_tasks = task.num_total_tasks;
         runnable->runTask(task.task_id, num_total_tasks);
+        // its possible we still need the lock to do this atomic update
         // lk.lock();
         // printf("thread %d acquired lock for updating busy_threads \n", thread_id);
         // even if the shared variable is atomic, it must be modified 
@@ -322,7 +323,7 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
         Task task = {runnable, i, num_total_tasks}; //task_id is set to i {0, 1, 2, ... , num_total_tasks - 1}
         task_queue.push(task);
     }
-    printf("pushed %d tasks to queue\n", num_total_tasks);
+    // printf("pushed %d tasks to queue\n", num_total_tasks);
     if (workers.size() == 0) {
         makeThreadPool();
     } 
@@ -331,17 +332,17 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     // signalling thread must spin until all tasks are done
     while (true) {
         // lock to check task_queue size
-        printf("busy threads: %d, task_queue: %d \n", busy_threads.load(), task_queue.size());
-        printf("main thread waiting\n");
+        // printf("busy threads: %d, task_queue: %d \n", busy_threads.load(), task_queue.size());
+        // printf("main thread waiting\n");
         // we need to automagically release this lock when it goes out of scope
         std::unique_lock<std::mutex> lk(*mutex_);
-        printf("main thread got lock\n");
+        // printf("main thread got lock\n");
         // printf("task queue size is %ld\n", task_queue.size());
         // printf("busy threads is %d\n", busy_threads.load());
         if (task_queue.size() == 0 && busy_threads == 0) {
             // no more work to be done, return from run
             lk.unlock();
-            printf("run is returning\n");
+            // printf("run is returning\n");
             return;
         } else {
             // work remains, let someone else have the lock
