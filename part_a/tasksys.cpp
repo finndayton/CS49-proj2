@@ -247,7 +247,7 @@ void workerThreadFuncSleeping(
     TaskSystemParallelThreadPoolSleeping* instance, 
     int thread_id
 ) {
-    while (!instance->done) {
+    while (true) {
         // how do we know its time to kill the thread?
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
@@ -255,6 +255,10 @@ void workerThreadFuncSleeping(
         printf("thread %d waiting\n", thread_id);
         instance->condition_variable_->wait(lk);
         printf("thread %d awoken\n", thread_id);
+        if (instance->done) {
+            // lock goes out of scope so its released
+            return;
+        }
         // if task queue is empty, just continue
         if (instance->task_queue.size() == 0) {
             continue;
@@ -267,7 +271,7 @@ void workerThreadFuncSleeping(
         lk.unlock();
         // let someone else have the lock
         instance->condition_variable_->notify_all();
-        
+
         // do actual run
         auto runnable = task.runnable;
         auto num_total_tasks = task.num_total_tasks;
