@@ -311,6 +311,7 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
         Task task = {runnable, i, num_total_tasks}; //task_id is set to i {0, 1, 2, ... , num_total_tasks - 1}
         task_queue.push(task);
     }
+    printf("pushed %d tasks to queue", num_total_tasks);
     if (workers.size() == 0) {
         makeThreadPool();
     } 
