@@ -173,7 +173,7 @@ int main(int argc, char** argv)
                     printf("ERROR: Results did not pass correctness check! (iter=%d, ref_impl=%s)\n",
                         j, t->name());
                     exit(1);
-                }
+                } 
 
                 minT = std::min(minT, result.time);
 

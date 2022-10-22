@@ -42,8 +42,6 @@ void TaskSystemSerial::sync() {
  * ================================================================
  */
 
-
-//Shashank Implmentation
 const char* TaskSystemParallelSpawn::name() {
     return "Parallel + Always Spawn";
 }
@@ -55,36 +53,66 @@ TaskSystemParallelSpawn::TaskSystemParallelSpawn(int num_threads): ITaskSystem(n
     // Implementations are free to add new class member variables
     // (requiring changes to tasksys.h).
     //
-    // TODO: SHASHANK assuming that max_threads refers to worker threads only not main thread
     max_threads_ = num_threads;
 }
 
-TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
+static inline void thread_worker_function(IRunnable* runnable, int thread_id, int num_threads, int num_total_tasks) {
+    int tasks_per_thread = num_total_tasks / num_threads;
 
-void TaskSystemParallelSpawn::workerThreadStart(IRunnable* runnable, int start, int end, int num_total_tasks) {
-    // function called by worker thread
-    // loop from start to end inclusive
-    for (int i = start; i < end; i++) {
+    // task_id should be from 0 to num_total_tasks - 1
+    int task_id_start = thread_id * tasks_per_thread;
+    int task_id_end = task_id_start + tasks_per_thread;
+    
+    /* 
+    Case where num_total_tasks % num_threads != 0
+    Example: num_total_tasks = 15
+             num_threads     = 8
+    In this case, we launch 8 threads. The 8 thread worker functions receive thread_ids {0, 1, 2...7}
+    But, tasks_per_thread for each thread worker is only 1 (15 / 8 = 1). This means the last thread, thread_id = 7,
+    is going to have to pick up the slack and, instead of just completing the 8th task, do task 8, 9, 10...15. That's right. 
+    This means that if (thread_id == num_threads - 1) AND num_total_tasks % num_threads != 0, we must update 
+    task_id_end to include tasks 9, 10, 11, 12...15. (7 more tasks). This is num_total_tasks % num_threads MORE tasks 
+    */ 
+
+    if (thread_id == num_threads - 1 && num_total_tasks % num_threads != 0) {
+        task_id_end += num_total_tasks % num_threads;
+    }
+    for (int i = task_id_start; i < task_id_end; i++) {
         runnable->runTask(i, num_total_tasks);
     }
 }
 
+TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
+
 void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
-    // static assignment is easiest
-    std::thread workers[max_threads_];
-    int num_tasks_per_thread = num_total_tasks/max_threads_;
-    int i = 0;
-    int prev = 0;
-    int next = num_tasks_per_thread;
-    while (i < max_threads_) {
-        workers[i] = std::thread(workerThreadStart, runnable, prev, next, num_total_tasks);
-        prev = next;
-        next = next + num_tasks_per_thread; 
-        i += 1;
+    // printf("max_threads_: %d\n", max_threads_);
+
+
+    //
+    // TODO: CS149 students will modify the implementation of this
+    // method in Part A. The implementation provided below runs all
+    // tasks sequentially on the calling thread.
+
+    // Make up to std::min(num_threads,  num_total_tasks) number of threads
+    // each thread gets a certain contiguous chunk of the total work.
+
+    // runnable is, for example, a PingPongTask class instance, which extends IRunnable. 
+    // PingPongTask's implementation of runTask() is to fill an output array, from an input array, etc. 
+    // For this super_light test, our run() function is called 400 times (400 bulk task launches)
+    // with each launch containing 64 tasks to be done. num_elements = 32 * 1024;
+    // and n_iters = 32. We and to parallelize these 64 tasks using num_thread threads. 
+    // 
+
+    int num_threads = std::min(max_threads_, num_total_tasks);
+    std::thread workers[num_threads];
+    for (int i = 0; i < num_threads; i++) {
+        workers[i] = std::thread(thread_worker_function, runnable, i, num_threads, num_total_tasks);
     }
 
-    // join worker threads 
-    for (int i = 0; i < max_threads_; i++) {
+    // handle case where (num_total_tasks / num_threads) is something like 258 / 8 = 32 tasks for
+    // the 8 threads + 2 tasks left over. This means the 8th thread (i == 7) 
+
+    for (int i = 0; i < num_threads; i++) {
         workers[i].join();
     }
 }
@@ -112,40 +140,28 @@ void workerThreadFunc(
     TaskSystemParallelThreadPoolSpinning* instance, 
     int thread_id
 ) {
-    // printf("thread %d is starting\n", thread_id);
     while (!instance->done) {
+
         instance->task_queue_mutex->lock(); // common mutex for the class
-        // printf("instance->task_queue.size(): %d\n", instance->task_queue.size());
-        // printf("debug: %d\n", instance->debug);
+
         if (instance->task_queue.size() > 0) {
-            
-            // acquire mutex and then pop_back
-            if (instance->task_queue.size() == 0) break;
-
-            printf("thread %d successfully acquired the lock\n", thread_id);
+            instance->busy_threads++;
             Task task = instance->task_queue.front();
-            // printf("    to try to run task %d\n", task.task_id);
-            // int task_id = task_queue->front();
-            printf("    to take up task %d\n", task.task_id);
             instance->task_queue.pop();
-            instance->debug--;
-            printf("Now tasks_queue is %ld elements long\n", instance->task_queue.size());
 
-            // parent thread tries to check queue.size() here
-
-            // busy_threads++;
             instance->task_queue_mutex->unlock();
-            // does it release the mutex now? it should
-            // do something with task
+
             auto runnable = task.runnable;
-            // printf("%d", task_id);
             auto num_total_tasks = task.num_total_tasks;
+            // printf("runTask(task.task_id = %d, num_total_tasks = %d);\n", task.task_id, num_total_tasks);
             runnable->runTask(task.task_id, num_total_tasks);
-            // busy_threads--;
+
+
+            instance->busy_threads--;
+
         } else {
             instance->task_queue_mutex->unlock();
         }
-        // printf("thead %d is stuck here while task_queue size = %ld\n", thread_id, instance->task_queue.size());
     }
 }
 
@@ -153,11 +169,14 @@ TaskSystemParallelThreadPoolSpinning::TaskSystemParallelThreadPoolSpinning(int n
     max_threads = num_threads;
     task_queue_mutex = new std::mutex();
     done = false;
-    debug = 0;
+    busy_threads = 0;
+}
 
-    // busy_threads = 0;
-    // printf("mkaing thread pool");
-    // makeThreadPool();
+TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning() {
+    // printf("entering destructor\n");
+    done = true;
+    killThreadPool();
+    delete task_queue_mutex;
 }
 
 void TaskSystemParallelThreadPoolSpinning::makeThreadPool() {
@@ -173,38 +192,26 @@ void TaskSystemParallelThreadPoolSpinning::killThreadPool() {
     }
 }
 
-TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning() {
-    done = true;
-    delete task_queue_mutex;
-    killThreadPool();
-}
 
-
-// what we know: run() is called once and fucks up on the first call. spins. 
-// task_queue in main thread is not zero?
 void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_total_tasks) {
-    // add tasks to queue, if queue is full, wait until there is space
-    printf("run() called with num_total_tasks = %d", num_total_tasks);
     for (int i = 0; i < num_total_tasks; i++) {
-        Task task = {runnable, i, num_total_tasks};
+        Task task = {runnable, i, num_total_tasks}; //task_id is set to i {0, 1, 2, ... , num_total_tasks - 1}
         task_queue.push(task);
-        printf("run called! incrementing debug from %d to %d\n", debug, debug + 1);
-        debug++;
     }
-    printf("just created the task queue. It has %d tasks in it\n", task_queue.size());
-    // return;
     if (workers.size() == 0) {
         makeThreadPool();
     } 
 
-    printf("debug: %d\n", debug);
-    printf("Hello\n");
-    while (task_queue.size() > 0) {
-        // printf("line 191 spinning. Task_queue size: %d\n", task_queue.size());
-        printf("line 191 spinning\n");
+    while (true) {
+        task_queue_mutex->lock();
+        if (task_queue.size() == 0 && busy_threads == 0) {
+            task_queue_mutex->unlock();
+            // printf("leaving run\n");
+            return;
+        } else {
+            task_queue_mutex->unlock();
+        }
     }
-    printf("end of run reached\n");
-
 }
 
 

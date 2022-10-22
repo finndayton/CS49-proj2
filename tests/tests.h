@@ -588,7 +588,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
                          int num_elements, int base_iters) {
 
     int num_tasks = 64;
-    int num_bulk_task_launches = 400;   
+    int num_bulk_task_launches = 1;   
 
     int* input = new int[num_elements];
     int* output = new int[num_elements];
@@ -618,7 +618,6 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
     double start_time = CycleTimer::currentSeconds();
     TaskID prev_task_id;
     for (int i=0; i<num_bulk_task_launches; i++) {
-        // printf("here\n");
         if (do_async) {
             std::vector<TaskID> deps;
             if (i > 0) {
@@ -627,13 +626,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
             prev_task_id = t->runAsyncWithDeps(
                 runnables[i], num_tasks, deps);
         } else {
-            // printf("hi\n");
-            // printf((const char*)t);
             t->run(runnables[i], num_tasks);
-            if (t->name()=="Parallel + Thread Pool + Spin") {
-                printf("t->run(runnables[%d], num_tasks);", i);
-            }
-            // printf("run finsihed running\n")
         }
     }
     if (do_async)
@@ -675,7 +668,6 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
 TestResults superSuperLightTest(ITaskSystem* t) {
     int num_elements = 32 * 1024;
     int base_iters = 0;
-    printf("superSuperLight test called\n");
     return pingPongTest(t, true, false, num_elements, base_iters);
 }
 
