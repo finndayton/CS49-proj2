@@ -330,8 +330,9 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
             return;
         } else {
             // let someone else have the lock
-            mutex_->unlock();
+            mutex_->lock();
             condition_variable_->notify_all();
+            mutex_->unlock();
         }
     }
 }
