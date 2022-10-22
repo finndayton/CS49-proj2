@@ -669,7 +669,6 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
 TestResults superSuperLightTest(ITaskSystem* t) {
     int num_elements = 32 * 1024;
     int base_iters = 0;
-    printf("running super super light\n");
     return pingPongTest(t, true, false, num_elements, base_iters);
 }
 
@@ -745,6 +744,7 @@ TestResults recursiveFibonacciTestBase(ITaskSystem* t, bool do_async) {
         t->sync();
     } else {
         for (int i = 0; i < num_bulk_task_launches; i++) {
+            printf("Running bulk task launch %d of %d", i, num_bulk_task_launches);
             t->run(fib_tasks[i], num_tasks);
         }
     }
