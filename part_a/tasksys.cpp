@@ -297,6 +297,8 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
         while(task_queue.size() != 0 || busy_threads != 0) {
             condition_variable_->wait(lk);
         }
+        lk.unlock();
+        return;
         // printf("main thread got lock\n");
         // printf("task queue size is %ld\n", task_queue.size());
         // printf("busy threads is %d\n", busy_threads.load());
