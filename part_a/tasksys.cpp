@@ -270,14 +270,14 @@ void workerThreadFunc(
         // how do we know its time to kill the thread?
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
-        instance->mutex_->lock();
-        instance->condition_variable_->wait(instance->mutex_);
+        std::unique_lock<std::mutex> lk(instance->mutex_);
+        instance->condition_variable_->wait(lk);
         // lock is now re-acquired
         // do the work in the critical section
         instance->busy_threads++;
         Task task = instance->task_queue.front();
         instance->task_queue.pop();
-        instance->mutex_->unlock();
+        lk.unlock();
         // do actual run
         auto runnable = task.runnable;
         auto num_total_tasks = task.num_total_tasks;
