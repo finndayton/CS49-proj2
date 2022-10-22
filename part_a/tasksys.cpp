@@ -288,6 +288,9 @@ void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
 }
 
 void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
+    // don't need the lock, just notify all so they can exit
+    // might need to do some gymnastics with the lock
+    condition_variable->notify_all();
     for (int i = 0; i < max_threads; i++) {
         // make threads, and make them free to start off with
         workers[i].join();   
