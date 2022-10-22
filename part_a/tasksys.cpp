@@ -205,7 +205,7 @@ void workerThreadFuncSleeping(
     TaskSystemParallelThreadPoolSleeping* instance, 
     int thread_id
 ) {
-    while (true) {
+    while (!instance->done) {
         // how do we know its time to kill the thread?
         // a lock must be held in order to wait on a condition variable
         // always awoken because of notify_all from main thread, which is fine
@@ -259,9 +259,6 @@ void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
     // I don't think we need a lock here, because we are the only thread
     // modifying the done variable
     done = true;
-    // std::unique_lock<std::mutex> lk(*mutex_);
-    // done = true;
-    // lk.unlock();
     condition_variable_->notify_all();
     for (int i = 0; i < max_threads; i++) {
         // make threads, and make them free to start off with
