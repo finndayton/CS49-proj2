@@ -310,6 +310,7 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
         if (task_queue.size() == 0 && busy_threads == 0) {
             // no more work to be done, return from run
             mutex_->unlock();
+            printf("run is returning\n");
             return;
         } else {
             // let someone else have the lock
