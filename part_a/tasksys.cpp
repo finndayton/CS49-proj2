@@ -139,7 +139,7 @@ const char* TaskSystemParallelThreadPoolSpinning::name() {
 void workerThreadFunc(
     TaskSystemParallelThreadPoolSpinning* instance, 
     int thread_id
-) {
+) {    
     while (!instance->done) {
 
         instance->task_queue_mutex->lock(); // common mutex for the class
@@ -235,34 +235,76 @@ const char* TaskSystemParallelThreadPoolSleeping::name() {
 }
 
 TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int num_threads): ITaskSystem(num_threads) {
-    //
-    // TODO: CS149 student implementations may decide to perform setup
-    // operations (such as thread pool construction) here.
-    // Implementations are free to add new class member variables
-    // (requiring changes to tasksys.h).
-    //
+    condition_variable_ = new std::condition_variable();
+    mutex_ = new std::mutex();
+    busy_threads = 0;
+    done = false;
+    max_threads = num_threads;
+}
+
+void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
+    for (int i = 0; i < max_threads; i++) {
+        workers.push_back(std::thread(&workerThreadFunc, this, i));
+    }
+}
+
+void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
+    for (int i = 0; i < max_threads; i++) {
+        // make threads, and make them free to start off with
+        workers[i].join();   
+    }
 }
 
 TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
-    //
-    // TODO: CS149 student implementations may decide to perform cleanup
-    // operations (such as thread pool shutdown construction) here.
-    // Implementations are free to add new class member variables
-    // (requiring changes to tasksys.h).
-    //
+    done = true;
+    killThreadPool();
+    delete condition_variable_;
+    delete mutex_;
+}
+
+void workerThreadFunc(
+    TaskSystemParallelThreadPoolSleeping* instance, 
+    int thread_id
+) {
+    while (!instance->done) {
+        // how do we know its time to kill the thread?
+        // a lock must be held in order to wait on a condition variable
+        // always awoken because of notify_all from main thread, which is fine
+        instance->mutex_->lock();
+        instance->condition_variable_->wait(instance->mutex_);
+        // lock is now re-acquired
+        // do the work in the critical section
+        instance->busy_threads++;
+        Task task = instance->task_queue.front();
+        instance->task_queue.pop();
+        instance->mutex_->unlock();
+        // do actual run
+        auto runnable = task.runnable;
+        auto num_total_tasks = task.num_total_tasks;
+        runnable->runTask(task.task_id, num_total_tasks);
+        instance->busy_threads--;
+    }
 }
 
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
-
-
-    //
-    // TODO: CS149 students will modify the implementation of this
-    // method in Parts A and B.  The implementation provided below runs all
-    // tasks sequentially on the calling thread.
-    //
-
     for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
+        Task task = {runnable, i, num_total_tasks}; //task_id is set to i {0, 1, 2, ... , num_total_tasks - 1}
+        task_queue.push(task);
+    }
+    if (workers.size() == 0) {
+        makeThreadPool();
+    } 
+
+
+    // signalling thread must spin until all tasks are done
+    mutex_->lock();
+    while (task_queue.size() > 0 || busy_threads > 0) {
+        mutex_->unlock();
+        // release the mutex before calling notify_all to make sure waiting threads have a chance 
+        // to make progress
+        condition_variable_->notify_all();
+        // reacquire lock
+        mutex_->lock();
     }
 }
 
