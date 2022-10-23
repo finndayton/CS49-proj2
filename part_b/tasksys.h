@@ -74,7 +74,7 @@ struct Task {
     int num_total_sub_tasks;
     TaskID task_id;
     std::unordered_set<TaskID> waiting_for; // can this live on the stack or should it be elsewhere?
-}
+};
 
 /*
  * TaskSystemParallelThreadPoolSleeping: This class is the student's

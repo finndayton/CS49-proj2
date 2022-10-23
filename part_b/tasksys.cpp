@@ -146,8 +146,12 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
 
 
     // add BTL to the waiting queue
+    std::unordered_set<TaskID> deps_as_set;
+    for (auto dep : deps) {
+        deps_as_set.insert(dep);
+    }
     
-    Task task = {runnable, 0, num_total_tasks, cur_task_id, deps};
+    Task task = {runnable, 0, num_total_tasks, cur_task_id, deps_as_set};
     // lock here - shared resource
     waiting_btl_set.insert(task);
     // unlock
