@@ -8,116 +8,6 @@ ITaskSystem::~ITaskSystem() {}
 
 /*
  * ================================================================
- * Serial task system implementation
- * ================================================================
- */
-
-const char* TaskSystemSerial::name() {
-    return "Serial";
-}
-
-TaskSystemSerial::TaskSystemSerial(int num_threads): ITaskSystem(num_threads) {
-}
-
-TaskSystemSerial::~TaskSystemSerial() {}
-
-void TaskSystemSerial::run(IRunnable* runnable, int num_total_tasks) {
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
-}
-
-TaskID TaskSystemSerial::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
-                                          const std::vector<TaskID>& deps) {
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
-
-    return 0;
-}
-
-void TaskSystemSerial::sync() {
-    return;
-}
-
-/*
- * ================================================================
- * Parallel Task System Implementation
- * ================================================================
- */
-
-const char* TaskSystemParallelSpawn::name() {
-    return "Parallel + Always Spawn";
-}
-
-TaskSystemParallelSpawn::TaskSystemParallelSpawn(int num_threads): ITaskSystem(num_threads) {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-}
-
-TaskSystemParallelSpawn::~TaskSystemParallelSpawn() {}
-
-void TaskSystemParallelSpawn::run(IRunnable* runnable, int num_total_tasks) {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
-}
-
-TaskID TaskSystemParallelSpawn::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
-                                                 const std::vector<TaskID>& deps) {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
-
-    return 0;
-}
-
-void TaskSystemParallelSpawn::sync() {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-    return;
-}
-
-/*
- * ================================================================
- * Parallel Thread Pool Spinning Task System Implementation
- * ================================================================
- */
-
-const char* TaskSystemParallelThreadPoolSpinning::name() {
-    return "Parallel + Thread Pool + Spin";
-}
-
-TaskSystemParallelThreadPoolSpinning::TaskSystemParallelThreadPoolSpinning(int num_threads): ITaskSystem(num_threads) {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-}
-
-TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning() {}
-
-void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_total_tasks) {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
-}
-
-TaskID TaskSystemParallelThreadPoolSpinning::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
-                                                              const std::vector<TaskID>& deps) {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
-
-    return 0;
-}
-
-void TaskSystemParallelThreadPoolSpinning::sync() {
-    // NOTE: CS149 students are not expected to implement TaskSystemParallelSpawn in Part B.
-    return;
-}
-
-/*
- * ================================================================
  * Parallel Thread Pool Sleeping Task System Implementation
  * ================================================================
  */
@@ -128,17 +18,47 @@ const char* TaskSystemParallelThreadPoolSleeping::name() {
 
 TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int num_threads): ITaskSystem(num_threads) {
     max_threads = num_threads;
+    
+    ready_btl_map_mutex = new std::mutex();
+    ready_task_queue_mutex = new std::mutex();
+    waiting_btl_set_mutex = new std::mutex();
 
+    // initialize condition variables
+    ready_btl_map_cv = new std::condition_variable();
+    ready_task_queue_cv = new std::condition_variable();
+    waiting_btl_set_cv = new std::condition_variable();
 
+    busy_threads = 0;
+    done = false;
+
+    makeThreadPool();
+    
+}
+
+void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
+    for (int i = 0; i < max_threads; i++) {
+        workers.push_back(std::thread(&workerThreadFuncSleeping, this, i));
+    }
+}
+
+void TaskSystemParallelThreadPoolSleeping::killThreadPool() {
+    // I don't think we need a lock here, because we are the only thread
+    // modifying the done variable
+    done = true;
+    ready_task_queue_cv->notify_all();
+    for (int i = 0; i < max_threads; i++) {
+        workers[i].join();   
+    }
 }
 
 TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
-    //
-    // TODO: CS149 student implementations may decide to perform cleanup
-    // operations (such as thread pool shutdown construction) here.
-    // Implementations are free to add new class member variables
-    // (requiring changes to tasksys.h).
-    //
+    killThreadPool();
+    delete ready_btl_map_cv;
+    delete ready_task_queue_cv;
+    delete waiting_btl_set_cv;
+    delete ready_btl_map_mutex;
+    delete ready_task_queue_mutex;
+    delete waiting_btl_set_mutex;
 }
 
 
@@ -150,7 +70,7 @@ void workerThreadFunc(
         std::unique_lock<std::mutex> lk(*(instance->ready_task_queue_mutex));
         // did we need a lock for the done variable?
         while(!instance->done && instance->ready_task_queue.size() == 0) {
-            instance->condition_variable_->wait(lk);
+            instance->ready_task_queue_cv->wait(lk);
         }
         if (instance->done) {
             return;
@@ -174,14 +94,6 @@ void workerThreadFunc(
 }
 
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
-
-
-    //
-    // TODO: CS149 students will modify the implementation of this
-    // method in Parts A and B.  The implementation provided below runs all
-    // tasks sequentially on the calling thread.
-    //
-
     for (int i = 0; i < num_total_tasks; i++) {
         runnable->runTask(i, num_total_tasks);
     }
