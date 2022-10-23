@@ -28,6 +28,11 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     ready_task_queue_cv = new std::condition_variable();
     waiting_btl_set_cv = new std::condition_variable();
 
+    // initialize data structures
+    ready_btl_map = new std::unordered_map<TaskID, Task>;
+    ready_task_queue = new std::queue<SubTask>;
+    waiting_btl_set = new std::unordered_set<Task>;
+
     busy_threads = 0;
     done = false;
 
@@ -150,7 +155,7 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
     for (auto dep : deps) {
         deps_as_set.insert(dep);
     }
-    
+
     Task task = {runnable, 0, num_total_tasks, cur_task_id, deps_as_set};
     // lock here - shared resource
     waiting_btl_set.insert(task);
