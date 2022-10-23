@@ -100,24 +100,24 @@ const char* TaskSystemParallelThreadPoolSpinning::name() {
 void workerThreadFunc(
     TaskSystemParallelThreadPoolSpinning* instance, 
     int thread_id
-) {    
+) {  
+    // and maybe a lock here for done?
     while (!instance->done) {
-        std::unique_lock<std::mutex> lk(*(instance->task_queue_mutex));
-        if (instance->task_queue.size() > 0) {
+        instance->task_queue_mutex->lock();    
+        if (instance->task_queue.size() > 0) { 
             instance->busy_threads++;
             Task task = instance->task_queue.front();
             instance->task_queue.pop();
-            lk.unlock();
-
+            instance->task_queue_mutex->unlock();
             auto runnable = task.runnable;
             auto num_total_tasks = task.num_total_tasks;
             runnable->runTask(task.task_id, num_total_tasks);
 
-            lk.lock();
+            // instance->task_queue_mutex->lock();
             instance->busy_threads--;
-            lk.unlock();
+            // instance->task_queue_mutex->unlock();
         } else {
-            lk.unlock();
+            instance->task_queue_mutex->unlock();
         }
     }
 }
@@ -131,7 +131,9 @@ TaskSystemParallelThreadPoolSpinning::TaskSystemParallelThreadPoolSpinning(int n
 
 TaskSystemParallelThreadPoolSpinning::~TaskSystemParallelThreadPoolSpinning() {
     // printf("entering destructor\n");
+    task_queue_mutex->lock();
     done = true;
+    task_queue_mutex->unlock();
     killThreadPool();
     delete task_queue_mutex;
 }
@@ -152,10 +154,13 @@ void TaskSystemParallelThreadPoolSpinning::killThreadPool() {
 
 
 void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_total_tasks) {
+    task_queue_mutex->lock();
     for (int i = 0; i < num_total_tasks; i++) {
         Task task = {runnable, i, num_total_tasks}; //task_id is set to i {0, 1, 2, ... , num_total_tasks - 1}
         task_queue.push(task);
     }
+    task_queue_mutex->unlock();
+
     if (workers.size() == 0) {
         makeThreadPool();
     } 
@@ -308,13 +313,42 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     }
 }
 
+// bool containDependencies(const std::vector<TaskID>& deps)
+
+void workerThreadFuncAsync() {
+
+}
+
+
+// global task_queue in the constructor
+
 TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                                     const std::vector<TaskID>& deps) {
 
+    
 
-    //
-    // TODO: CS149 students will implement this method in Part B.
-    //
+    // return immediately 
+    if (workers.size() == 0) {
+        makeThreadPool();
+    }
+
+    // taskId = hash(inputs)
+
+    // add 
+
+    // hashset.append(taskId)
+
+    // return taskId;
+
+    //vars needed
+    // shared set of completed hash ids
+    // hash the three input parmas to get an id
+    // condition var between the threads for sleeping and notifying
+    // mutex to gaurd accesses to the shared set 
+    
+
+
+    // hash of the input params somehow
 
     return 0;
 }
