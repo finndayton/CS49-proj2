@@ -111,7 +111,7 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
         // create a subtask object for each
         read_task_queue.push({btl.runnable, i, btl.num_total_sub_tasks, btl.task_id});
     }
-    waiting_btl_set.erase(btl);
+    waiting_btl_set.erase(*btl);
 }
 
 void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
@@ -134,7 +134,7 @@ void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
             }
         }
         // remove the papa task from the ready_btl_map
-        ready_btl_map.erase(papa_task);
+        ready_btl_map.erase(*papa_task);
     }
 }
 
