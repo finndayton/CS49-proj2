@@ -107,32 +107,30 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
     // also pops it from the waiting_btl_queue
     // definitely lock for this shared resource access
     ready_btl_map[btl.task_id] = btl;
-    int btl_index = ready_btl_list.size() - 1;
-    for (int i = 0; i < btl.num_subtasks; i++) {
+    for (int i = 0; i < btl.num_total_sub_tasks; i++) {
         // create a subtask object for each
-        SubTask subtask = {btl.runnable, i, btl.num_total_subtasks, btl.task_id}
-        ready_task_queue.push(subtask);
+        read_task_queue.push({btl.runnable, i, btl.num_total_subtasks, btl.task_id});
     }
-    waiting_btl_set.remove(btl);
+    waiting_btl_set.erase(btl);
 }
 
 void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
     // when you finish a sub task, you need to increment the number of finished sub tasks
     Task* papa_task = ready_btl_map[subtask.btl_task_id];
-    papa_task->num_finished_subtasks++;
-    if (papa_task->num_finished_subtasks == papa_task->num_total_subtasks) {
+    papa_task->num_finished_sub_tasks++;
+    if (papa_task->num_finished_sub_tasks == papa_task->num_total_subtasks) {
         TaskID task_id = papa_task->task_id;
         // loop through every BTL in the waiting_btl_queue
         // remove the papa_task TaskID from the waiting_for set of every BTL 
         // in the waiting_btl_queue (if it exists)
         // for each BTL in the waiting_btl_queue, if the waiting_for set is empty, push it onto the ready_btl_queue
         // and push its subtasks onto the ready_task_queue
-        for (auto task : waiting_btl_set) {
-            if (task->waiting.count(task_id) > 0) {
-                task->waiting.erase(task_id);
+        for (auto btl : waiting_btl_set) {
+            if (btl.waiting.count(task_id) > 0) {
+                btl.waiting.erase(task_id);
             }
-            if (task->waiting.size() == 0) {
-                readyBtl(task);
+            if (btl.waiting.size() == 0) {
+                readyBtl(btl);
             }
         }
         // remove the papa task from the ready_btl_map
