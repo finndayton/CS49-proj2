@@ -72,30 +72,29 @@ struct SubTask {
 
 struct Task {
     IRunnable* runnable;
-    std::atomic<int> num_finished_sub_tasks;
+    // std::atomic<int> num_finished_sub_tasks;
+    int num_finished_sub_tasks; //guard with mutex
     int num_total_sub_tasks;
     TaskID task_id;
     std::unordered_set<TaskID> dependencies; // can this live on the stack or should it be elsewhere?
     
-    Task() = default; 
-    Task(IRunnable* runnable_, 
-         std::atomic<int> num_finished_sub_tasks_, 
-         int num_total_sub_tasks_,
-         TaskID task_id_,
-         std::unordered_set<TaskID> dependencies_);
+    // Task() = default; 
+    // Task(IRunnable* runnable_, 
+    //      std::atomic<int> num_finished_sub_tasks_, 
+    //      int num_total_sub_tasks_,
+    //      TaskID task_id_,
+    //      std::unordered_set<TaskID> dependencies_ = std::unordered_set<TaskID>());
 
     // Task(IRunnable* runnable_, 
     //      std::atomic<int> num_finished_sub_tasks_, 
     //      int num_total_sub_tasks_,
     //      TaskID task_id_,
-    //      std::unordered_set<TaskID> dependencies_)
-    //     {
-    //         runnable = runnable_;
-    //         num_finished_sub_tasks = num_finished_sub_tasks_;
-    //         num_total_sub_tasks = num_total_sub_tasks_;
-    //         task_id = task_id_;
-    //         dependencies = dependencies_;
-    //     } 
+    //      std::unordered_set<TaskID> dependencies_):
+    //         runnable(runnable_),
+    //         num_finished_sub_tasks(num_finished_sub_tasks_),
+    //         num_total_sub_tasks(num_total_sub_tasks_),
+    //         task_id(task_id_),
+    //         dependencies(dependencies_) {}        
         
 
     // bool operator==(const Task& otherTask) const {
