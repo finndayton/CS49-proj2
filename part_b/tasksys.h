@@ -99,8 +99,8 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         void makeThreadPool();
         void killThreadPool();
         
-        finishedSubTask(SubTask subtask);
-        readyBtl(Task btl); 
+        void finishedSubTask(SubTask subtask);
+        void readyBtl(Task btl); 
         
         std::condition_variable* ready_btl_map_cv;
         std::condition_variable* ready_task_queue_cv;
