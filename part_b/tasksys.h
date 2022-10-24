@@ -153,14 +153,21 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         void readyBtl(Task btl); 
 
         
-        std::condition_variable* busy_threads_cv;
-        std::condition_variable* ready_btl_map_cv;
-        std::condition_variable* ready_task_queue_cv;
-        std::condition_variable* waiting_btl_vec_cv;
+        // std::condition_variable* busy_threads_cv;
+        // std::condition_variable* ready_btl_map_cv;
+        // std::condition_variable* ready_task_queue_cv;
+        // std::condition_variable* waiting_btl_vec_cv;
+        // std::condition_variable* condition_variable_
 
-        std::mutex* ready_btl_map_mutex;
-        std::mutex* ready_task_queue_mutex;
-        std::mutex* waiting_btl_vec_mutex;
+        std::condition_variable* sync_cv;
+        std::condition_variable* threads_cv;
+
+        // std::mutex* ready_btl_map_mutex;
+        // std::mutex* ready_task_queue_mutex;
+        // std::mutex* waiting_btl_vec_mutex;
+        // std::mutex* num_finished_sub_tasks_mutex; // added this because removed the atomicity from num_finished_sub_tasks
+        std::mutex* threads_mutex;
+        std::mutex* sync_mutex;
 
         std::unordered_map<TaskID, Task> ready_btl_map;
         std::queue<SubTask> ready_task_queue;
