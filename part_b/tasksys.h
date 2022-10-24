@@ -72,59 +72,11 @@ struct SubTask {
 
 struct Task {
     IRunnable* runnable;
-    // std::atomic<int> num_finished_sub_tasks;
     int num_finished_sub_tasks; //guard with mutex
     int num_total_sub_tasks;
     TaskID task_id;
-    std::unordered_set<TaskID> dependencies; // can this live on the stack or should it be elsewhere?
-    
-    // Task() = default; 
-    // Task(IRunnable* runnable_, 
-    //      std::atomic<int> num_finished_sub_tasks_, 
-    //      int num_total_sub_tasks_,
-    //      TaskID task_id_,
-    //      std::unordered_set<TaskID> dependencies_ = std::unordered_set<TaskID>());
-
-    // Task(IRunnable* runnable_, 
-    //      std::atomic<int> num_finished_sub_tasks_, 
-    //      int num_total_sub_tasks_,
-    //      TaskID task_id_,
-    //      std::unordered_set<TaskID> dependencies_):
-    //         runnable(runnable_),
-    //         num_finished_sub_tasks(num_finished_sub_tasks_),
-    //         num_total_sub_tasks(num_total_sub_tasks_),
-    //         task_id(task_id_),
-    //         dependencies(dependencies_) {}        
-        
-
-    // bool operator==(const Task& otherTask) const {
-    //     // not bulletproof, but good enough for this assignment
-    //     return task_id == otherTask.task_id;
-    // };
-
-    // struct HashFunction {
-        // size_t operator()(const Task& task) const {
-        //     return std::hash<int>()(task.task_id);
-        // }
-    // };   
+    std::unordered_set<TaskID> dependencies; // can this live on the stack or should it be elsewhere?   
 };
-
-// class HashClass {
-//     public: 
-//         size_t operator()(const Task& task) const {
-//             return std::hash<int>()(task.task_id);
-//         }
-// };
-
-
-
-// size_t hashFunction(Task* task) {
-//     return std::hash<int>()(task->task_id);
-// }
-
-// bool equals(Task* a, Task* b){
-//     return a->task_id == b->task_id;
-// }
 
 
 /*

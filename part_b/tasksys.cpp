@@ -276,7 +276,6 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
 
     Task task = Task{runnable, 0, num_total_tasks, cur_task_id, deps_as_set};
     // lock here - shared resource
-    // waiting_btl_set.insert(task);
     waiting_btl_vec.push_back(task);
     // unlock
 
@@ -294,7 +293,8 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
     // 2. if there are any BTLs in the waiting queue
     // 3. busy threads is 0
     // Put sync to sleep until these conditions are satisfied using the 3 condition vars declared int he header. 
-    while (true) {
-        // do nothing
+    std::unique_lock<std::mutex> lk(*ready_task_queue_mutex);
+    while (ready_task_queue.size() > 0 || waiting_btl_vec.size() > 0 || busy_threads > 0) {
+        ready_task_queue_cv->wait(lk);
     }
 }
