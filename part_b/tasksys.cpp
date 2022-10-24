@@ -109,14 +109,14 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
     ready_btl_map[btl.task_id] = btl;
     for (int i = 0; i < btl.num_total_sub_tasks; i++) {
         // create a subtask object for each
-        read_task_queue.push({btl.runnable, i, btl.num_total_subtasks, btl.task_id});
+        read_task_queue.push({btl.runnable, i, btl.num_total_sub_tasks, btl.task_id});
     }
     waiting_btl_set.erase(btl);
 }
 
 void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
     // when you finish a sub task, you need to increment the number of finished sub tasks
-    Task* papa_task = ready_btl_map[subtask.btl_task_id];
+    Task papa_task = ready_btl_map[subtask.btl_task_id];
     papa_task->num_finished_sub_tasks++;
     if (papa_task->num_finished_sub_tasks == papa_task->num_total_subtasks) {
         TaskID task_id = papa_task->task_id;
@@ -126,8 +126,8 @@ void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
         // for each BTL in the waiting_btl_queue, if the waiting_for set is empty, push it onto the ready_btl_queue
         // and push its subtasks onto the ready_task_queue
         for (auto btl : waiting_btl_set) {
-            if (btl.waiting.count(task_id) > 0) {
-                btl.waiting.erase(task_id);
+            if (btl.waiting_for.count(task_id) > 0) {
+                btl.waiting_for.erase(task_id);
             }
             if (btl.waiting.size() == 0) {
                 readyBtl(btl);
