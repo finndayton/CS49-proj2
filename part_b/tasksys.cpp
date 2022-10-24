@@ -352,8 +352,8 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
     // This lock is atomically released before the thread goes to sleep
     // when `wait()` is called. The lock is atomically re-acquired when
     // the thread is woken up using `notify_all()`.
-    while (true){
-        std::unique_lock<std::mutex> lk(*threads_mutex);
+    while (true) {
+        std::unique_lock<std::mutex> lk(*threads_mutex); //deadlocking here. 
 
         while (ready_task_queue.size() > 0) {
             sync_cv->wait(lk);

@@ -246,7 +246,7 @@ void workerThreadFuncSleeping(
         instance->busy_threads--;
         // lk.unlock();
         // printf("thread %d released lock after updating busy_threads \n", thread_id);
-        instance->condition_variable_->notify_all();
+        // instance->condition_variable_->notify_all();
 
     }
 }
