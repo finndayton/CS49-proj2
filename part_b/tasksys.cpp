@@ -28,9 +28,6 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     ready_task_queue_cv = new std::condition_variable();
     waiting_btl_set_cv = new std::condition_variable();
 
-    // initialize data structures
-    waiting_btl_set = new std::unordered_set<Task>;
-
     busy_threads = 0;
     done = false;
 
