@@ -12,6 +12,9 @@ ITaskSystem::~ITaskSystem() {}
  * ================================================================
  */
 
+// forward decl for workerThreadFunc
+void workerThreadFunc(TaskSystemParallelThreadPoolSleeping* task_system, int thread_id);
+
 const char* TaskSystemParallelThreadPoolSleeping::name() {
     return "Parallel + Thread Pool + Sleep";
 }
