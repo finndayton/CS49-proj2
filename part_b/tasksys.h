@@ -4,6 +4,7 @@
 #include "itasksys.h"
 #include <unordered_set>
 #include <thread>
+#include <functional>
 #include <atomic>
 #include <mutex>
 #include <queue>
@@ -75,7 +76,20 @@ struct Task {
     int num_total_sub_tasks;
     TaskID task_id;
     std::unordered_set<TaskID> waiting_for; // can this live on the stack or should it be elsewhere?
+    
+    bool operator==(const Task& otherPoint) const {
+        // not bulletproof, but good enough for this assignment
+        if (this->task_id == otherPoint.task_id) return true;
+        return false;
+    };
+
+    struct HashFunction {
+        size_t operator()(const Task& task) const {
+            return std::hash<int>()(task.task_id);
+        }
+    };   
 };
+
 
 /*
  * TaskSystemParallelThreadPoolSleeping: This class is the student's
@@ -112,7 +126,7 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
 
         std::unordered_map<TaskID, Task> ready_btl_map;
         std::queue<SubTask> ready_task_queue;
-        std::unordered_set<Task> waiting_btl_set;
+        std::unordered_set<Task, Task::HashFunction> waiting_btl_set;
 
         std::vector<std::thread> workers;
         std::atomic<int> busy_threads;
