@@ -61,6 +61,7 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
         void sync();
 };
 
+// might need default constructors here
 struct SubTask {
     IRunnable* runnable;
     int sub_task_id;
@@ -97,6 +98,9 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         
         void makeThreadPool();
         void killThreadPool();
+        
+        finishedSubTask(SubTask subtask);
+        readyBtl(Task btl); 
         
         std::condition_variable* ready_btl_map_cv;
         std::condition_variable* ready_task_queue_cv;

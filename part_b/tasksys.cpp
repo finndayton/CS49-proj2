@@ -30,7 +30,6 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
 
     // initialize data structures
     ready_btl_map = new std::unordered_map<TaskID, Task>;
-    ready_task_queue = new std::queue<SubTask>;
     waiting_btl_set = new std::unordered_set<Task>;
 
     busy_threads = 0;
