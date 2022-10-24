@@ -174,10 +174,6 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
     // 2. if there are any BTLs in the waiting queue
     // 3. busy threads is 0
     while (true) {
-        std::unique_lock<std::mutex> lock(mtx);
-        if (num_tasks == 0) {
-            break;
-        }
-        cv.wait(lock);
+        // do nothing
     }
 }
