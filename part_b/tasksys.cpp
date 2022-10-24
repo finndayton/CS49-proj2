@@ -37,7 +37,7 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
 
 void TaskSystemParallelThreadPoolSleeping::makeThreadPool() {
     for (int i = 0; i < max_threads; i++) {
-        workers.push_back(std::thread(&workerThreadFuncSleeping, this, i));
+        workers.push_back(std::thread(&workerThreadFunc, this, i));
     }
 }
 
@@ -88,7 +88,7 @@ void workerThreadFunc(
         auto runnable = subtask.runnable;
         auto num_total_sub_tasks = subtask.num_total_sub_tasks;
         runnable->runTask(subtask.sub_task_id, num_total_sub_tasks);
-        finishedSubTask(subtask); // does the postprocessing 
+        instance->finishedSubTask(subtask); // does the postprocessing 
         instance->busy_threads--; 
     }
 }
@@ -106,7 +106,7 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
     ready_btl_map[btl.task_id] = btl;
     for (int i = 0; i < btl.num_total_sub_tasks; i++) {
         // create a subtask object for each
-        read_task_queue.push({btl.runnable, i, btl.num_total_sub_tasks, btl.task_id});
+        ready_task_queue.push({btl.runnable, i, btl.num_total_sub_tasks, btl.task_id});
     }
     waiting_btl_set.erase(btl);
 }
