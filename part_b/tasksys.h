@@ -75,20 +75,57 @@ struct Task {
     std::atomic<int> num_finished_sub_tasks;
     int num_total_sub_tasks;
     TaskID task_id;
-    std::unordered_set<TaskID> waiting_for; // can this live on the stack or should it be elsewhere?
+    std::unordered_set<TaskID> dependencies; // can this live on the stack or should it be elsewhere?
     
-    bool operator==(const Task& otherPoint) const {
-        // not bulletproof, but good enough for this assignment
-        if (this->task_id == otherPoint.task_id) return true;
-        return false;
-    };
+    Task() = default; 
+    Task(IRunnable* runnable_, 
+         std::atomic<int> num_finished_sub_tasks_, 
+         int num_total_sub_tasks_,
+         TaskID task_id_,
+         std::unordered_set<TaskID> dependencies_);
 
-    struct HashFunction {
-        size_t operator()(const Task& task) const {
-            return std::hash<int>()(task.task_id);
-        }
-    };   
+    // Task(IRunnable* runnable_, 
+    //      std::atomic<int> num_finished_sub_tasks_, 
+    //      int num_total_sub_tasks_,
+    //      TaskID task_id_,
+    //      std::unordered_set<TaskID> dependencies_)
+    //     {
+    //         runnable = runnable_;
+    //         num_finished_sub_tasks = num_finished_sub_tasks_;
+    //         num_total_sub_tasks = num_total_sub_tasks_;
+    //         task_id = task_id_;
+    //         dependencies = dependencies_;
+    //     } 
+        
+
+    // bool operator==(const Task& otherTask) const {
+    //     // not bulletproof, but good enough for this assignment
+    //     return task_id == otherTask.task_id;
+    // };
+
+    // struct HashFunction {
+        // size_t operator()(const Task& task) const {
+        //     return std::hash<int>()(task.task_id);
+        // }
+    // };   
 };
+
+// class HashClass {
+//     public: 
+//         size_t operator()(const Task& task) const {
+//             return std::hash<int>()(task.task_id);
+//         }
+// };
+
+
+
+// size_t hashFunction(Task* task) {
+//     return std::hash<int>()(task->task_id);
+// }
+
+// bool equals(Task* a, Task* b){
+//     return a->task_id == b->task_id;
+// }
 
 
 /*
@@ -115,18 +152,23 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         
         void finishedSubTask(SubTask subtask);
         void readyBtl(Task btl); 
+
         
+        std::condition_variable* busy_threads_cv;
         std::condition_variable* ready_btl_map_cv;
         std::condition_variable* ready_task_queue_cv;
-        std::condition_variable* waiting_btl_set_cv;
+        std::condition_variable* waiting_btl_vec_cv;
 
         std::mutex* ready_btl_map_mutex;
         std::mutex* ready_task_queue_mutex;
-        std::mutex* waiting_btl_set_mutex;
+        std::mutex* waiting_btl_vec_mutex;
 
         std::unordered_map<TaskID, Task> ready_btl_map;
         std::queue<SubTask> ready_task_queue;
-        std::unordered_set<Task, Task::HashFunction> waiting_btl_set;
+
+        // std::unordered_set<Task, HashClass> waiting_btl_set;
+        // Because I couldn't get the above set to work, a temporary fix is to mimic the set with a vector
+        std::vector<Task> waiting_btl_vec;
 
         std::vector<std::thread> workers;
         std::atomic<int> busy_threads;
