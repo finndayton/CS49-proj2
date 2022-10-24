@@ -110,7 +110,7 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         std::mutex* ready_task_queue_mutex;
         std::mutex* waiting_btl_set_mutex;
 
-        std::unordered_map<int, Task> ready_btl_map;
+        std::unordered_map<TaskID, Task> ready_btl_map;
         std::queue<SubTask> ready_task_queue;
         std::unordered_set<Task> waiting_btl_set;
 
