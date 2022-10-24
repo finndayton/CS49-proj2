@@ -208,6 +208,7 @@ void workerThreadFunc(
         // did we need a lock for the done variable?
         while(!instance->done && instance->ready_task_queue.size() == 0) {
             instance->threads_cv->wait(lk); //awoken by notify all. lock held when awoken.
+            printf("thread %d just woke up\n", thread_id);
         }
 
         if (instance->done) {
@@ -233,28 +234,32 @@ void workerThreadFunc(
     }
 }
 
-
+// Remove BTL from waiting_btl_vec, add to ready_btl_map and add sub_tasks to ready_task_queue
 void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
     // pushes a BTL onto the ready_btl_map and all its subtasks onto the ready_task_queue
     // also removes it from  waiting_btl_vec
     // definitely lock for this shared resource access
-
+    printf("readyBtl\n");
     threads_mutex->lock();
+    printf("244\n");
     ready_btl_map[btl.task_id] = btl; //book keeping map
+    printf("btl task_id: %d, btl.num_total_sub_tasks: %d\n", ready_btl_map[btl.task_id].task_id, btl.num_total_sub_tasks);
 
     for (int i = 0; i < btl.num_total_sub_tasks; i++) {
         // create a subtask object for each
+        printf("i: %d\n", i);
         ready_task_queue.push({btl.runnable, i, btl.num_total_sub_tasks, btl.task_id});
     }
 
-    // waiting_btl_set.erase(btl);
-    // find index to delete and remove the btl
+    // remove btl from waiting_btl_vec
+    printf("waiting_btl_vec.size() before: %d\n", waiting_btl_vec.size());
     for (size_t i = 0; i < waiting_btl_vec.size(); i++) {
         if (waiting_btl_vec[i].task_id == btl.task_id){
             waiting_btl_vec.erase(waiting_btl_vec.begin() + i);
             break;
         }
     }
+    printf("waiting_btl_vec.size() after: %d\n", waiting_btl_vec.size());
     threads_mutex->unlock();
 
     threads_cv->notify_all();  //wake up all the threads waiting on ready_task_queue_cv.size() because we just changed it!
@@ -262,32 +267,32 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
 
 void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
     // when you finish a sub task, you need to increment the number of finished sub tasks
-    Task papa_task = ready_btl_map[subtask.btl_task_id]; //bookkeeping map of BTLs that are ____
+    TaskID papa_task_id = subtask.btl_task_id;
 
     threads_mutex->lock();
-    papa_task.num_finished_sub_tasks++; //better to just make this atomic. Will do later. 
+    ready_btl_map[papa_task_id].num_finished_sub_tasks++; // bookkeeping map of BTLs 
 
-    if (papa_task.num_finished_sub_tasks == papa_task.num_total_sub_tasks) { //if this papa task is DONE
-        threads_mutex->unlock();
-        TaskID task_id = papa_task.task_id;
-        // loop through every BTL in the waiting_btl_queue
+    printf("BTL finished_sub_tasks: %d. (total = %d)\n", ready_btl_map[papa_task_id].num_finished_sub_tasks, ready_btl_map[papa_task_id].num_total_sub_tasks);
+
+    if (ready_btl_map[papa_task_id].num_finished_sub_tasks == ready_btl_map[papa_task_id].num_total_sub_tasks) { 
+        // if this was the last subtask in the btl (papa task). Papa is done. 
+        // loop through every BTL in the waiting_btl_queue and 
         // remove the papa_task TaskID from the dependencies set of every BTL 
         // in the waiting_btl_queue (if it exists)
-        // for each BTL in the waiting_btl_queue, if the dependencies set is empty, push it onto the ready_btl_queue
-        // and push its subtasks onto the ready_task_queue
-        threads_mutex->lock();
+        // If this zeros our the dependency set of a BTL in the waiting_btl_queue, remove it and push it to the ready_btl_queue
+        // AND push its subtasks onto the ready_task_queue
         for (auto btl : waiting_btl_vec) {
-            if (btl.dependencies.count(task_id) > 0) { //if this BTL listed this completed task_id as a dependency
-                btl.dependencies.erase(task_id);       //remove this task_id as dependency
+            if (btl.dependencies.count(papa_task_id) > 0) { //if this BTL listed this completed task_id as a dependency
+                btl.dependencies.erase(papa_task_id);       //remove this task_id as dependency
             }
             if (btl.dependencies.size() == 0) {        //if that made this BTL have 0 dependencies
+                printf("btl.dependencies.size() = %d. about to call readyBtl\n", btl.dependencies.size());
                 readyBtl(btl);                         //add it to readyBtl map and add its subtasks to the ready task queue 
             }
         }
-        threads_mutex->unlock();
         // remove the papa task from the ready_btl_map
-        threads_mutex->lock();
-        ready_btl_map.erase(task_id); //papa_task is DONE running
+        printf("290\n");
+        ready_btl_map.erase(papa_task_id); //papa_task is DONE running
         threads_mutex->unlock();
 
         sync_cv->notify_all(); //it could be the case that this was the last subtask in the entire runAsync(). 
@@ -348,7 +353,7 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
     // when `wait()` is called. The lock is atomically re-acquired when
     // the thread is woken up using `notify_all()`.
     while (true){
-        std::unique_lock<std::mutex> lk(*sync_mutex);
+        std::unique_lock<std::mutex> lk(*threads_mutex);
 
         while (ready_task_queue.size() > 0) {
             sync_cv->wait(lk);
@@ -360,7 +365,7 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
             return;
         } else {
             lk.unlock();
-            threads_cv->notify_all();
+            // threads_cv->notify_all();
         }
     }
 }
