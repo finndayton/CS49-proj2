@@ -103,7 +103,7 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         
         void finishedSubTask(SubTask subtask);
         void readyBtl(Task btl); 
-
+        void removeBtlFromWaitingBtlVec(TaskID btl_task_id);
         
         std::condition_variable* busy_threads_cv;
         std::condition_variable* ready_btl_map_cv;

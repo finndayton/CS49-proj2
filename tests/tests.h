@@ -527,8 +527,12 @@ TestResults simpleTest(ITaskSystem* t, bool do_async) {
         TaskID first_task_id = t->runAsyncWithDeps(&first, num_tasks, firstDeps);
         std::vector<TaskID> secondDeps;
         secondDeps.push_back(first_task_id);
+        printf("called run async with deps\n");
         t->runAsyncWithDeps(&second, num_tasks, secondDeps);
+        // printf("the waiting set is now %d\n", t->waiting_btl_vec.size());
+        printf("called sync\n");
         t->sync();
+        printf("returned from sync\n");
     } else {
         t->run(&first, num_tasks);
         t->run(&second, num_tasks);
