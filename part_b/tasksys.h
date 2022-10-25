@@ -75,7 +75,6 @@ struct Task {
     int num_finished_sub_tasks; //guard with mutex
     int num_total_sub_tasks;
     TaskID task_id;
-    std::unordered_set<TaskID> dependencies; // can this live on the stack or should it be elsewhere?   
 };
 
 
@@ -102,11 +101,11 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         void killThreadPool();
         
         void finishedSubTask(SubTask subtask);
-        void readyBtl(Task btl); 
-        void removeBtlFromWaitingBtlVec(TaskID btl_task_id);
+        void readyBtl(TaskID btl_task_id);
+        void finishedTask(TaskID papa_task_id);
+        // void removeBtlFromWaitingBtlVec(TaskID btl_task_id);
         void removeDependenciesFromWaitingBtlVec(TaskID btl_task_id);
 
-        std::condition_variable* busy_threads_cv;
         std::condition_variable* ready_btl_map_cv;
         std::condition_variable* ready_task_queue_cv;
         std::condition_variable* waiting_btl_vec_cv;
@@ -121,8 +120,10 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         std::unordered_map<TaskID, Task> ready_btl_map;
         std::queue<SubTask> ready_task_queue;
 
-        std::vector<Task> waiting_btl_vec;
+        std::vector<TaskID> waiting_btl_vec;
+        std::unordered_map<TaskID, Task> task_info;
         std::unordered_set<TaskID> completed_btls;
+        std::unordered_map<TaskID, std::unordered_set<TaskID>> dependencies;
 
         // keep track of total number of subtasks
         int total_subtasks;
