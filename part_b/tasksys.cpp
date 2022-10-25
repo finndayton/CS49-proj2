@@ -136,13 +136,17 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     ready_btl_map_mutex = new std::mutex();
     ready_task_queue_mutex = new std::mutex();
     waiting_btl_vec_mutex = new std::mutex();
+    subtasks_mutex = new std::mutex();
+    completed_btls_mutex = new std::mutex();
 
     // initialize condition variables
     ready_btl_map_cv = new std::condition_variable();
     ready_task_queue_cv = new std::condition_variable();
     waiting_btl_vec_cv = new std::condition_variable();
+    subtasks_cv = new std::condition_variable();
 
-    busy_threads = 0;
+    total_subtasks = 0;
+    finished_subtasks = 0;
     cur_task_id = 0;
     done = false;
 
@@ -171,9 +175,12 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     delete ready_btl_map_cv;
     delete ready_task_queue_cv;
     delete waiting_btl_vec_cv;
+    delete subtasks_cv;
     delete ready_btl_map_mutex;
     delete ready_task_queue_mutex;
     delete waiting_btl_vec_mutex;
+    delete subtasks_mutex;
+    delete completed_btls_mutex;
 }
 
 
@@ -184,56 +191,60 @@ void workerThreadFunc(
     while (true) {
         std::unique_lock<std::mutex> lk(*(instance->ready_task_queue_mutex)); //Declare condition variable and aquire lock on ready_task_queue
         // did we need a lock for the done variable?
-        // printf("thread %d: ready task queue size is %lu\n", thread_id, instance->ready_task_queue.size());
+        printf("thread %d: ready task queue size is %lu\n", thread_id, instance->ready_task_queue.size());
         while(!instance->done && instance->ready_task_queue.size() == 0) {
             instance->ready_task_queue_cv->wait(lk); 
-            // printf("thread %d: woke up\n", thread_id);
+            printf("thread %d: woke up\n", thread_id);
         }
         if (instance->done) {
+            instance->ready_task_queue_cv->notify_all();
             return;
         }
 
         // do the work in the critical section
-        instance->busy_threads++;
         SubTask subtask = instance->ready_task_queue.front();
         instance->ready_task_queue.pop();
         lk.unlock();
-        // printf("Thread %d is running sub task %d of task %d \n", thread_id, subtask.sub_task_id, subtask.btl_task_id);
-        // printf("released lock\n");
-        instance->ready_task_queue_cv->notify_all(); // notifying all now that we've reduced the size of the ready_task_queue
+        printf("Thread %d is running sub task %d of task %d \n", thread_id, subtask.sub_task_id, subtask.btl_task_id);
         
         // do actual run
         auto runnable = subtask.runnable;
         auto num_total_sub_tasks = subtask.num_total_sub_tasks;
         runnable->runTask(subtask.sub_task_id, num_total_sub_tasks);
         instance->finishedSubTask(subtask); // does the postprocessing 
-        instance->busy_threads--; 
+        printf("returned from finishedSubTask on subtask %d, task %d\n", subtask.sub_task_id, subtask.btl_task_id);
+        printf("trying to acquire lock on subtasks_mutex in thread %d\n", thread_id);
+        instance->subtasks_mutex->lock();
+        instance->finished_subtasks++; 
+        printf("made finished_subtasks %d in thread %d\n", instance->finished_subtasks, thread_id);
+        instance->subtasks_mutex->unlock();
         // think about making busy threads mutex and condition variable
-        instance->ready_task_queue_cv->notify_all(); // notifying all now that we've reduced busy_threads, definitely better to have a different CV for this
+        instance->subtasks_cv->notify_all(); 
     }
 }
 
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
-    // not sure how to go about implementing this
-    // runAsyncWithDeps(runnable, num_total_tasks, std::vector<TaskID>());
-    // sync();
+    runAsyncWithDeps(runnable, num_total_tasks, std::vector<TaskID>());
+    sync();
 }
 
 void TaskSystemParallelThreadPoolSleeping::removeBtlFromWaitingBtlVec(TaskID btl_task_id) {
     // nobody else can be modifying waiting_btl_vec
+    printf("WAITING TO ACQUIRE LOCK IN removeBtlFromWaitingBtlVec\n");
     waiting_btl_vec_mutex->lock();
+    printf("ACQUIRED LOCK IN removeBtlFromWaitingBtlVec\n");
     printf("trying to delete btl %d, acquired lock\n", btl_task_id);
     for (size_t i = 0; i < waiting_btl_vec.size(); i++) {
         auto cur_btl = waiting_btl_vec[i];
-        // printf("cur btl is %d\n", cur_btl.task_id);
-        if (waiting_btl_vec[i].task_id == (size_t) btl_task_id){
+        if (waiting_btl_vec[i].task_id == btl_task_id){
             waiting_btl_vec.erase(waiting_btl_vec.begin() + i);
-            // printf("removed btl %d from waiting_btl_vec\n", btl_task_id);
-            // printf("waiting_btl_vec size is %lu\n", waiting_btl_vec.size());
+            printf("removed btl %d from waiting_btl_vec\n", btl_task_id);
+            printf("waiting_btl_vec size is %lu\n", waiting_btl_vec.size());
             break;
         }
     }
-    printf("deleted btl %d, releasing lock\n", btl_task_id);
+    printf("removed btl %d from waiting_btl_vec, releasing lock\n", btl_task_id);
+    printf("waiting_btl_vec size is %lu\n", waiting_btl_vec.size());
     waiting_btl_vec_mutex->unlock();
 }
 
@@ -243,18 +254,37 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
     // definitely lock for this shared resource access
     ready_btl_map_mutex->lock();
     ready_btl_map[btl.task_id] = btl; //book keeping map
-    ready_btl_map_mutex->unlock();
 
     for (int i = 0; i < btl.num_total_sub_tasks; i++) {
         // create a subtask object for each
         ready_task_queue.push({btl.runnable, i, btl.num_total_sub_tasks, btl.task_id});
     }
+    ready_btl_map_mutex->unlock();
     // wake up because there's more ready tasks!
     ready_task_queue_cv->notify_all();
 
     // find index to delete and remove the btl
-    // printf("removing btl %d from waiting_btl_vec\n", btl.task_id);
+    printf("removing btl %d from waiting_btl_vec\n", btl.task_id);
     removeBtlFromWaitingBtlVec(btl.task_id);
+}
+
+void TaskSystemParallelThreadPoolSleeping::removeDependenciesFromWaitingBtlVec(TaskID btl_task_id) {
+    // we currently hold the waiting_btl_vec_mutex, so we make sure to unlock before 
+    // calling readyBtl
+    auto it = waiting_btl_vec.begin();
+    while (it != waiting_btl_vec.end()) {
+        printf("btl %d: %lu dependencies\n", it->task_id, it->dependencies.size());
+        it->dependencies.erase(btl_task_id);
+        if (it->dependencies.size() == 0) {
+            waiting_btl_vec_mutex->unlock();
+            readyBtl(*it); // readyBtl removes the element from waiting_btl_vec as well 
+            waiting_btl_vec_mutex->lock();
+            it = waiting_btl_vec.erase(it);
+        } else {
+            ++it;
+        }
+        printf("btl %d: %lu dependencies\n", it->task_id, it->dependencies.size());
+    }
 }
 
 void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
@@ -263,43 +293,28 @@ void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
     // definitely lock for this shared resource access
     ready_btl_map_mutex->lock();
     ready_btl_map[papa_task_id].num_finished_sub_tasks++;
-    // printf("finished subtask %d of btl %d\n", subtask.sub_task_id, subtask.btl_task_id);
+    printf("finished subtask %d of btl %d\n", subtask.sub_task_id, subtask.btl_task_id);
     // printf("num finished subtasks is %d\n", ready_btl_map[papa_task_id].num_finished_sub_tasks);
     // printf("num total subtasks is %d\n", ready_btl_map[papa_task_id].num_total_sub_tasks);
     if (ready_btl_map[papa_task_id].num_finished_sub_tasks == ready_btl_map[papa_task_id].num_total_sub_tasks) {
         ready_btl_map_mutex->unlock();
-        // loop through every BTL in the waiting_btl_queue
-        // remove the papa_task TaskID from the dependencies set of every BTL 
-        // in the waiting_btl_queue (if it exists)
-        // for each BTL in the waiting_btl_queue, if the dependencies set is empty, push it onto the ready_btl_queue
-        // and push its subtasks onto the ready_task_queue
+        printf("waiting for the waiting_btl_vec_mutex lock in sub task %d of task %d\n", subtask.sub_task_id, subtask.btl_task_id);
         waiting_btl_vec_mutex->lock();
-        for (auto btl : waiting_btl_vec) {
-            // printf("btl %d has %lu dependencies\n", btl.task_id, btl.dependencies.size());
-            if (btl.dependencies.count(papa_task_id) > 0) {
-                // printf("removing dependency %d from btl %d\n", papa_task_id, btl.task_id);
-                btl.dependencies.erase(papa_task_id);
-            }
-            if (btl.dependencies.size() == 1) {
-                // printf("btl %d depends on %d\n", btl.task_id, *btl.dependencies.begin());
-            }
-            if (btl.dependencies.size() == 0) {
-                readyBtl(btl);
-            }
-        }
+        printf("got the lock\n");
+        removeDependenciesFromWaitingBtlVec(papa_task_id);
+        completed_btls.insert(papa_task_id);
+        printf("[HERE] added btl %d to completed_btls\n", papa_task_id);
         waiting_btl_vec_mutex->unlock();
+
         ready_btl_map_mutex->lock();
         // remove the papa task from the ready_btl_map
         ready_btl_map.erase(papa_task_id);
         ready_btl_map_mutex->unlock();
+        printf("should return to workerThreadFUnc now that btl %d is done\n", papa_task_id);
+    } else {
+        ready_btl_map_mutex->unlock();
     }
-    ready_btl_map_mutex->unlock();
 }
-
-// TODO: 
-// Fix compiler errors. Don't hashing for TaskID / Write hash function for sets
-// One mutex per resource. 
-// Implement sync() to block until all threadFunctions are done runnong. 
 
 /**
  * runAsyncWithDeps is never going to be called from multiple threads at the same time.
@@ -307,24 +322,45 @@ void TaskSystemParallelThreadPoolSleeping::finishedSubTask(SubTask subtask) {
 */
 TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                                     const std::vector<TaskID>& deps) {
-    // add BTL to the waiting queue
+    // add BTL to the waiting queue, or the ready queue if no dependencies
+    waiting_btl_vec_mutex->lock();
     std::unordered_set<TaskID> deps_as_set;
+    printf("appending btl %d with asyncRun\n", cur_task_id);
     for (auto dep : deps) {
-        deps_as_set.insert(dep);
+        if (completed_btls.count(dep) == 0) {
+            deps_as_set.insert(dep);
+        }
     }
 
+    // printf("deps_as_set for btl %d is: ", cur_task_id);
+    // for (auto dep : deps_as_set) {
+    //     printf("%d ", dep);
+    // }
+    // printf("\n");
+
+    // printf("completed_btls is: ");
+    // for (auto it = completed_btls.begin(); it != completed_btls.end(); it++) {
+    //     printf("%d ", *it);
+    // }
+    // printf("\n");
+    
+
     Task task = Task{runnable, 0, num_total_tasks, cur_task_id, deps_as_set};
+    
     if (deps_as_set.size() == 0) {
+        waiting_btl_vec_mutex->unlock();
         readyBtl(task);
-        // printf("added btl %d to ready_btl_map\n", cur_task_id);
     } else {
-        // printf("adding btl %d to waiting_btl_vec\n", cur_task_id);
-        // lock here - shared resource
-        waiting_btl_vec_mutex->lock();
+        printf("adding btl %d to waiting_btl_vec\n", cur_task_id);
         waiting_btl_vec.push_back(task);
         waiting_btl_vec_mutex->unlock();
-        // unlock
     }
+
+    // is this the right place to do this? 
+    subtasks_mutex->lock();
+    total_subtasks += num_total_tasks;
+    subtasks_mutex->unlock();
+
     cur_task_id++;
     return cur_task_id - 1;
 }
@@ -339,12 +375,13 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
     // 2. if there are any BTLs in the waiting queue
     // 3. busy threads is 0
     // Put sync to sleep until these conditions are satisfied using the 3 condition vars declared int he header. 
-    std::unique_lock<std::mutex> lk(*ready_task_queue_mutex);
-    while (ready_task_queue.size() > 0 || waiting_btl_vec.size() > 0 || busy_threads > 0) {
+    std::unique_lock<std::mutex> lk(*subtasks_mutex);
+    while (finished_subtasks != total_subtasks) {
         printf("waiting for lock in sync\n");
-        printf("ready_task_queue.size() = %lu, waiting_btl_vec.size() = %lu, busy_threads = %d\n", ready_task_queue.size(), waiting_btl_vec.size(), busy_threads.load());
-        ready_task_queue_cv->wait(lk);
-        // printf("got lock in sync\n");
+        printf("finished subtasks at this point is %d/%d\n", finished_subtasks, total_subtasks);
+        printf("ready_task_queue.size() = %lu, waiting_btl_vec.size() = %lu \n", ready_task_queue.size(), waiting_btl_vec.size());
+        subtasks_cv->wait(lk);
+        printf("got lock in sync\n");
     }
-    // printf("returned from sync\n");
+    printf("returned from sync\n");
 }

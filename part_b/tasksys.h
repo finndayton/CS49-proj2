@@ -104,22 +104,30 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         void finishedSubTask(SubTask subtask);
         void readyBtl(Task btl); 
         void removeBtlFromWaitingBtlVec(TaskID btl_task_id);
-        
+        void removeDependenciesFromWaitingBtlVec(TaskID btl_task_id);
+
         std::condition_variable* busy_threads_cv;
         std::condition_variable* ready_btl_map_cv;
         std::condition_variable* ready_task_queue_cv;
         std::condition_variable* waiting_btl_vec_cv;
+        std::condition_variable* subtasks_cv;
 
         std::mutex* ready_btl_map_mutex;
         std::mutex* ready_task_queue_mutex;
         std::mutex* waiting_btl_vec_mutex;
+        std::mutex* subtasks_mutex;
+        std::mutex* completed_btls_mutex;
 
         std::unordered_map<TaskID, Task> ready_btl_map;
         std::queue<SubTask> ready_task_queue;
 
-        // std::unordered_set<Task, HashClass> waiting_btl_set;
-        // Because I couldn't get the above set to work, a temporary fix is to mimic the set with a vector
         std::vector<Task> waiting_btl_vec;
+        std::unordered_set<TaskID> completed_btls;
+
+        // keep track of total number of subtasks
+        int total_subtasks;
+        int finished_subtasks;
+
 
         std::vector<std::thread> workers;
         std::atomic<int> busy_threads;
