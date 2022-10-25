@@ -124,7 +124,13 @@ void TaskSystemParallelThreadPoolSpinning::sync() {
 
 //forward decl.
 void workerThreadFunc(TaskSystemParallelThreadPoolSleeping* instance, int thread_id);
+void postRun(SubTask subtask);
 
+void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
+    for (int i = 0; i < num_total_tasks; i++) {
+        runnable->runTask(i, num_total_tasks);
+    }
+}
 const char* TaskSystemParallelThreadPoolSleeping::name() {
     return "Parallel + Thread Pool + Sleep";
 }
@@ -137,9 +143,10 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     // (requiring changes to tasksys.h).
     //
     num_threads_ = num_threads;
-    spinning_ = true;
+    done_ = false;
     target_total_sub_tasks_ = 0;
     total_sub_tasks_completed_so_far_ = 0;
+    curr_task_id_ = 0;
 
     sync_cv_ = new std::condition_variable;
     threads_cv_ = new std::condition_variable;
@@ -157,6 +164,10 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     // Implementations are free to add new class member variables
     // (requiring changes to tasksys.h).
     //
+    done_ = true;
+    threads_cv_->notify_all(); // may need to synchonize on sleeping_threads first
+
+
 }
 
 void TaskSystemParallelThreadPoolSleeping::initializeThreadPool() {
@@ -169,38 +180,55 @@ void workerThreadFunc(
     TaskSystemParallelThreadPoolSleeping* instance, 
     int thread_id
 ) {
+    while(true) {
+        std::unique_lock<std::mutex> lk(*(instance->mutex_));
+        while (!instance->done_ && instance->subtasks_queue_.size() == 0) {
+            instance->threads_cv_->wait(lk);
+        }
+        if (instance->done_) return;
 
-    
-
+        SubTask subtask = instance->subtasks_queue_.front();
+        instance->subtasks_queue_.pop();
+        lk.unlock();
+        
+        //run!
+        subtask.runnable->runTask(subtask.sub_task_id, subtask.num_total_subtasks);
+        instance->postRun(subtask);
+    }
 }
 
-void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
+void TaskSystemParallelThreadPoolSleeping::postRun(SubTask subtask) {
+    mutex_->lock();
+    TaskID papa_id = subtask.papa_id;
+    btls_num_subtasks_left_[papa_id]--;
 
-
-    //
-    // TODO: CS149 students will modify the implementation of this
-    // method in Parts A and B.  The implementation provided below runs all
-    // tasks sequentially on the calling thread.
-    //
-
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
+    //if done with this btl...
+    if (btls_num_subtasks_left_[papa_id] == 0) {
+        completed_tasks_[papa_id] = true;
     }
+
+    //come back to this based on your implementation of run below
+    for (auto task: tasks_) {
+        for (TaskID dep_id: task.deps) {
+            if (!completed_tasks_[dep_id]) return;
+        }
+
+    }
+    mutex_->unlock(); //here?
 }
 
 TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                                     const std::vector<TaskID>& deps) {
 
+    Task task = Task{runnable, num_total_tasks, curr_task_id_, deps};
+ 
+    //func that determines what to do with this task. maybe deps are handled already
 
-    //
-    // TODO: CS149 students will implement this method in Part B.
-    //
-
-    for (int i = 0; i < num_total_tasks; i++) {
-        runnable->runTask(i, num_total_tasks);
-    }
-
-    return 0;
+    target_total_sub_tasks_ += num_total_tasks;
+    
+    
+    return curr_task_id_++;
+                                                        
 }
 
 void TaskSystemParallelThreadPoolSleeping::sync() {
