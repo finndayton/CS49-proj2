@@ -122,6 +122,9 @@ void TaskSystemParallelThreadPoolSpinning::sync() {
  * ================================================================
  */
 
+//forward decl.
+void workerThreadFunc(TaskSystemParallelThreadPoolSleeping* instance, int thread_id);
+
 const char* TaskSystemParallelThreadPoolSleeping::name() {
     return "Parallel + Thread Pool + Sleep";
 }
@@ -133,6 +136,18 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     // Implementations are free to add new class member variables
     // (requiring changes to tasksys.h).
     //
+    num_threads_ = num_threads;
+    spinning_ = true;
+    target_total_sub_tasks_ = 0;
+    total_sub_tasks_completed_so_far_ = 0;
+
+    sync_cv_ = new std::condition_variable;
+    threads_cv_ = new std::condition_variable;
+
+    sync_mutex_ = new std::mutex; 
+    mutex_ = new std::mutex; 
+
+    initializeThreadPool();
 }
 
 TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
@@ -142,6 +157,21 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     // Implementations are free to add new class member variables
     // (requiring changes to tasksys.h).
     //
+}
+
+void TaskSystemParallelThreadPoolSleeping::initializeThreadPool() {
+    for (int i = 0; i < num_threads_; i++) {
+        workers_.push_back(std::thread(&workerThreadFunc, this, i));
+    }
+}
+
+void workerThreadFunc(
+    TaskSystemParallelThreadPoolSleeping* instance, 
+    int thread_id
+) {
+
+    
+
 }
 
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
