@@ -262,10 +262,6 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
     ready_btl_map_mutex->unlock();
     // wake up because there's more ready tasks!
     ready_task_queue_cv->notify_all();
-
-    // find index to delete and remove the btl
-    printf("removing btl %d from waiting_btl_vec\n", btl.task_id);
-    removeBtlFromWaitingBtlVec(btl.task_id);
 }
 
 void TaskSystemParallelThreadPoolSleeping::removeDependenciesFromWaitingBtlVec(TaskID btl_task_id) {
