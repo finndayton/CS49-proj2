@@ -267,19 +267,19 @@ void TaskSystemParallelThreadPoolSleeping::readyBtl(Task btl) {
 void TaskSystemParallelThreadPoolSleeping::removeDependenciesFromWaitingBtlVec(TaskID btl_task_id) {
     // we currently hold the waiting_btl_vec_mutex, so we make sure to unlock before 
     // calling readyBtl
-    auto it = waiting_btl_vec.begin();
-    while (it != waiting_btl_vec.end()) {
-        printf("btl %d: %lu dependencies\n", it->task_id, it->dependencies.size());
-        it->dependencies.erase(btl_task_id);
-        if (it->dependencies.size() == 0) {
-            waiting_btl_vec_mutex->unlock();
-            readyBtl(*it); // readyBtl removes the element from waiting_btl_vec as well 
-            waiting_btl_vec_mutex->lock();
-            it = waiting_btl_vec.erase(it);
-        } else {
-            ++it;
+    for (auto it = waiting_btl_vec.begin(); it != waiting_btl_vec.end(); it++) {
+        auto cur_btl = *it;
+        for (size_t i = 0; i < cur_btl.dependencies.size(); i++) {
+            if (cur_btl.dependencies[i] == btl_task_id) {
+                cur_btl.dependencies.erase(cur_btl.dependencies.begin() + i);
+                break;
+            }
         }
-        printf("btl %d: %lu dependencies\n", it->task_id, it->dependencies.size());
+        if (cur_btl.dependencies.size() == 0) {
+            readyBtl(cur_btl);
+            it = waiting_btl_vec.erase(it);
+            it--;
+        }
     }
 }
 
