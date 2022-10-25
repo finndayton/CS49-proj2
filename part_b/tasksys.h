@@ -166,7 +166,7 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         // std::mutex* ready_task_queue_mutex;
         // std::mutex* waiting_btl_vec_mutex;
         // std::mutex* num_finished_sub_tasks_mutex; // added this because removed the atomicity from num_finished_sub_tasks
-        std::mutex* threads_mutex;
+        std::mutex* general_mutex;
         std::mutex* sync_mutex;
 
         std::unordered_map<TaskID, Task> ready_btl_map;
@@ -177,9 +177,12 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         std::vector<Task> waiting_btl_vec;
 
         std::vector<std::thread> workers;
-        std::atomic<int> busy_threads;
+        // std::atomic<int> busy_threads;
+
+        std::atomic<int> total_sub_tasks;
+        std::atomic<int> completed_sub_tasks;
         bool done;
-        int cur_task_id; // it is initially 0
+        std::atomic<int> cur_task_id; // it is initially 0
 };
 
 #endif

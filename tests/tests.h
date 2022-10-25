@@ -588,7 +588,7 @@ TestResults pingPongTest(ITaskSystem* t, bool equal_work, bool do_async,
                          int num_elements, int base_iters) {
 
     int num_tasks = 64;
-    int num_bulk_task_launches = 1;   
+    int num_bulk_task_launches = 400;   
 
     int* input = new int[num_elements];
     int* output = new int[num_elements];
@@ -743,7 +743,6 @@ TestResults recursiveFibonacciTestBase(ITaskSystem* t, bool do_async) {
         t->sync();
     } else {
         for (int i = 0; i < num_bulk_task_launches; i++) {
-            // printf("Running bulk task launch %d of %d\n", i, num_bulk_task_launches);
             t->run(fib_tasks[i], num_tasks);
         }
     }
