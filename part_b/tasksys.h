@@ -118,6 +118,9 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
     //class functions
     void initializeThreadPool();
     void postRun(SubTask subtask);
+    void wakeUpThreads();
+    void taskify(Task task);
+    const std::vector<TaskID>updateDeps(const std::vector<TaskID>& deps);
 };
 
 #endif

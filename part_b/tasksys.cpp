@@ -167,6 +167,11 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     done_ = true;
     threads_cv_->notify_all(); // may need to synchonize on sleeping_threads first
 
+    for (int i = 0; i < num_threads_; i++) {
+        workers_[i].join();   
+    }
+
+    //deletes here
 
 }
 
@@ -183,7 +188,11 @@ void workerThreadFunc(
     while(true) {
         std::unique_lock<std::mutex> lk(*(instance->mutex_));
         while (!instance->done_ && instance->subtasks_queue_.size() == 0) {
-            instance->threads_cv_->wait(lk);
+
+            instance->sleeping_threads_[thread_id] = true;
+            instance->threads_cv_->wait(lk); //go to sleep. SEGFAULT
+            instance->sleeping_threads_[thread_id] = false;
+
         }
         if (instance->done_) return;
 
@@ -193,6 +202,7 @@ void workerThreadFunc(
         
         //run!
         subtask.runnable->runTask(subtask.sub_task_id, subtask.num_total_subtasks);
+
         instance->postRun(subtask);
     }
 }
@@ -205,37 +215,82 @@ void TaskSystemParallelThreadPoolSleeping::postRun(SubTask subtask) {
     //if done with this btl...
     if (btls_num_subtasks_left_[papa_id] == 0) {
         completed_tasks_[papa_id] = true;
+
+        //big debate: where to put this block?
+        sync_mutex_->lock();
+        total_sub_tasks_completed_so_far_++;
+        sync_mutex_->unlock();
+        sync_cv_->notify_one();
+
     }
 
-    //come back to this based on your implementation of run below
+    //there may be some different tasks we can taskify now
     for (auto task: tasks_) {
+        bool covered = true;
         for (TaskID dep_id: task.deps) {
-            if (!completed_tasks_[dep_id]) return;
+            if(!completed_tasks_[dep_id]) {
+                covered = false;
+            }
         }
-
+        if (covered) {
+            mutex_->unlock();
+            taskify(task);
+            mutex_->lock();
+        }
     }
-    mutex_->unlock(); //here?
+    mutex_->unlock(); //this here? for now. 
+
+}
+
+void TaskSystemParallelThreadPoolSleeping::taskify(Task task) {
+    mutex_->lock();
+    for (int i = 0; i < task.num_total_subtasks; i++) {
+        subtasks_queue_.push({task.runnable, task.num_total_subtasks, task.task_id, i});
+    }
+    mutex_->unlock();
+    threads_cv_->notify_all(); //could cause race condition. discuss solutions
+}
+
+const std::vector<TaskID> TaskSystemParallelThreadPoolSleeping::updateDeps(const std::vector<TaskID>& deps){
+    std::vector<TaskID> new_deps;
+    for (TaskID id: deps){
+        if (!completed_tasks_[id]) {
+            new_deps.push_back(id);
+        }
+    }
+    return new_deps;
 }
 
 TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                                     const std::vector<TaskID>& deps) {
-
+    mutex_->lock();
     Task task = Task{runnable, num_total_tasks, curr_task_id_, deps};
- 
-    //func that determines what to do with this task. maybe deps are handled already
 
-    target_total_sub_tasks_ += num_total_tasks;
+    // sync_mutex_->lock();
+    target_total_sub_tasks_ += num_total_tasks; //guard???
+    // sync_mutex_->unlock();
     
-    
+    tasks_.push_back(task);
+    completed_tasks_.push_back(false);
+    btls_num_subtasks_left_.push_back(num_total_tasks);
+
+    if (updateDeps(deps).size() == 0) taskify(task);
+
+    mutex_->unlock();
     return curr_task_id_++;
                                                         
 }
 
 void TaskSystemParallelThreadPoolSleeping::sync() {
+    std::unique_lock<std::mutex> lk(*sync_mutex_); //deadlocking here. 
 
-    //
-    // TODO: CS149 students will modify the implementation of this method in Part B.
-    //
+    while (total_sub_tasks_completed_so_far_ != target_total_sub_tasks_) {
+         sync_cv_->wait(lk);
+    }
+    total_sub_tasks_completed_so_far_ = 0;
+    target_total_sub_tasks_ = 0;
+    curr_task_id_ = 0;
+    
 
     return;
 }
