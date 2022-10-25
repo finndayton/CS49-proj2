@@ -93,9 +93,9 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         void sync();
 
     //class variables 
-    std::atomic<int> target_total_sub_tasks_;
-    std::atomic<int> total_sub_tasks_completed_so_far_; 
-
+    std::atomic<int> num_subtasks_completed_;
+    std::atomic<int> target_num_sub_tasks_;
+    
     int num_threads_;
     bool done_;
     int curr_task_id_;

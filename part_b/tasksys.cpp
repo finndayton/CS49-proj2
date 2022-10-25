@@ -144,8 +144,8 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     //
     num_threads_ = num_threads;
     done_ = false;
-    target_total_sub_tasks_ = 0;
-    total_sub_tasks_completed_so_far_ = 0;
+    num_subtasks_completed_ = 0;
+    target_num_sub_tasks_ = 0;
     curr_task_id_ = 0;
 
     sync_cv_ = new std::condition_variable;
@@ -177,6 +177,7 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
 
 void TaskSystemParallelThreadPoolSleeping::initializeThreadPool() {
     for (int i = 0; i < num_threads_; i++) {
+        sleeping_threads_.push_back(true);
         workers_.push_back(std::thread(&workerThreadFunc, this, i));
     }
 }
@@ -197,12 +198,14 @@ void workerThreadFunc(
         if (instance->done_) return;
 
         SubTask subtask = instance->subtasks_queue_.front();
+        printf("just popped subtask with sub_task_id: %d with num_total_subtasks: %d with papa_id: %d\n", subtask.sub_task_id, subtask.num_total_subtasks, subtask.papa_id);
         instance->subtasks_queue_.pop();
+
         lk.unlock();
         
         //run!
         subtask.runnable->runTask(subtask.sub_task_id, subtask.num_total_subtasks);
-
+        
         instance->postRun(subtask);
     }
 }
@@ -210,29 +213,31 @@ void workerThreadFunc(
 void TaskSystemParallelThreadPoolSleeping::postRun(SubTask subtask) {
     mutex_->lock();
     TaskID papa_id = subtask.papa_id;
-    btls_num_subtasks_left_[papa_id]--;
+    btls_num_subtasks_left_[papa_id]--; //we are doing this wayyyyy to many times. 
 
+    // printf("line 216. sub_task_id =  %d, papa_id = %d, btls_num_subtasks_left_[papa_id] = %d, btls_num_subtasks_left_.size(),: %d, : \n", subtask.sub_task_id, papa_id, btls_num_subtasks_left_[papa_id], btls_num_subtasks_left_.size());
     //if done with this btl...
     if (btls_num_subtasks_left_[papa_id] == 0) {
         completed_tasks_[papa_id] = true;
 
         //big debate: where to put this block?
         sync_mutex_->lock();
-        total_sub_tasks_completed_so_far_++;
+        num_subtasks_completed_+=subtask.num_total_subtasks;
         sync_mutex_->unlock();
         sync_cv_->notify_one();
-
     }
 
     //there may be some different tasks we can taskify now
     for (auto task: tasks_) {
-        bool covered = true;
+        if (completed_tasks_[task.task_id]) continue; //if already completed we don't care about it
+        
+        bool has_no_dependencies = true;
         for (TaskID dep_id: task.deps) {
             if(!completed_tasks_[dep_id]) {
-                covered = false;
+                has_no_dependencies = false;
             }
         }
-        if (covered) {
+        if (has_no_dependencies) {
             mutex_->unlock();
             taskify(task);
             mutex_->lock();
@@ -266,15 +271,22 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
     mutex_->lock();
     Task task = Task{runnable, num_total_tasks, curr_task_id_, deps};
 
-    // sync_mutex_->lock();
-    target_total_sub_tasks_ += num_total_tasks; //guard???
-    // sync_mutex_->unlock();
+    sync_mutex_->lock();
+    target_num_sub_tasks_ += num_total_tasks; 
+    // printf("just created a task. num_total_sub_tasks = %d, target_num_sub_tasks_: %d, papa_id: %d, num_subtasks_completed_: %d\n", num_total_tasks, target_num_sub_tasks_.load(), curr_task_id_, num_subtasks_completed_.load());
+    sync_mutex_->unlock();
     
     tasks_.push_back(task);
     completed_tasks_.push_back(false);
     btls_num_subtasks_left_.push_back(num_total_tasks);
+    
 
-    if (updateDeps(deps).size() == 0) taskify(task);
+    if (updateDeps(deps).size() == 0) {
+        mutex_->unlock();
+        taskify(task);
+        mutex_->lock();
+    }
+
 
     mutex_->unlock();
     return curr_task_id_++;
@@ -284,13 +296,14 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
 void TaskSystemParallelThreadPoolSleeping::sync() {
     std::unique_lock<std::mutex> lk(*sync_mutex_); //deadlocking here. 
 
-    while (total_sub_tasks_completed_so_far_ != target_total_sub_tasks_) {
+    while (num_subtasks_completed_ != target_num_sub_tasks_) {
          sync_cv_->wait(lk);
     }
-    total_sub_tasks_completed_so_far_ = 0;
-    target_total_sub_tasks_ = 0;
+
+    //reset!
     curr_task_id_ = 0;
-    
+    num_subtasks_completed_ = 0;
+    target_num_sub_tasks_ = 0;
 
     return;
 }
